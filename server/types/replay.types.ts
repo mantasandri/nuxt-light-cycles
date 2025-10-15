@@ -6,7 +6,7 @@
 export interface PlayerAction {
   tick: number;
   playerId: string;
-  action: 'move' | 'brake';
+  action: 'move' | 'brake' | 'useTrailEraser';
   payload: {
     direction?: 'up' | 'down' | 'left' | 'right';
     braking?: boolean;
@@ -16,7 +16,7 @@ export interface PlayerAction {
 
 export interface GameEvent {
   tick: number;
-  type: 'playerCrashed' | 'powerUpSpawned' | 'powerUpCollected' | 'gameStarted' | 'gameOver';
+  type: 'playerCrashed' | 'powerUpSpawned' | 'powerUpCollected' | 'gameStarted' | 'gameOver' | 'positionSnapshot';
   payload: any;
   timestamp: number;
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { usePlayerSettings, AVATAR_OPTIONS } from '~/composables/usePlayerSettings';
 import LobbyPanel from '~/components/LobbyPanel.vue';
 import LobbyBrowser from '~/components/LobbyBrowser.vue';
@@ -11,7 +11,7 @@ import VirtualDPad from '~/components/VirtualDPad.vue';
 interface PowerUp {
   x: number;
   y: number;
-  type: 'speed';
+  type: 'speed' | 'shield' | 'trailEraser';
 }
 
 interface Player {
@@ -28,6 +28,8 @@ interface Player {
   isBraking: boolean;
   brakeStartTime: number | null;
   gameId: string;
+  hasShield: boolean;
+  hasTrailEraser: boolean;
 }
 
 interface LobbySettings {
@@ -109,6 +111,23 @@ const obstacles = ref<string[]>([]);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 let ctx: CanvasRenderingContext2D | null = null;
 const cellSize = 20;
+
+// Current player (for boost status display)
+const currentPlayer = computed(() => {
+  return gamePlayers.value.find(p => p.id === playerId.value);
+});
+
+// Reactive time for boost timers (updates every 100ms when playing)
+const currentTime = ref(Date.now());
+let timeUpdateInterval: NodeJS.Timeout | null = null;
+
+const hasAnyBoost = computed(() => {
+  const player = currentPlayer.value;
+  if (!player) return false;
+  
+  const hasSpeed = player.speedBoostUntil && currentTime.value < player.speedBoostUntil;
+  return hasSpeed || player.hasShield || player.hasTrailEraser;
+});
 
 // Controls
 const isBraking = ref(false);
@@ -392,6 +411,12 @@ const connectWebSocket = () => {
             showReplayBrowser.value = false;
             showReplayPlayer.value = false;
             
+            // Start time update interval for boost timers
+            if (timeUpdateInterval) clearInterval(timeUpdateInterval);
+            timeUpdateInterval = setInterval(() => {
+              currentTime.value = Date.now();
+            }, 100);
+            
             // Make sure canvas is properly sized when game starts
             if (canvasRef.value && currentGridSize.value > 0) {
               canvasRef.value.width = currentGridSize.value * cellSize;
@@ -404,6 +429,12 @@ const connectWebSocket = () => {
           } else if (data.payload.state === 'waiting') {
             gameState.value = 'waiting';
             showLobby.value = true;
+            
+            // Stop time update interval when not playing
+            if (timeUpdateInterval) {
+              clearInterval(timeUpdateInterval);
+              timeUpdateInterval = null;
+            }
           }
           
           // Update ready state
@@ -430,9 +461,22 @@ const connectWebSocket = () => {
 
             if (p.id === playerId.value) {
               currentDirection.value = p.direction;
+              // Debug log for current player
+              if (p.hasShield || p.hasTrailEraser) {
+                console.log('[Client] Player boosts:', { 
+                  hasShield: p.hasShield, 
+                  hasTrailEraser: p.hasTrailEraser,
+                  speedBoostUntil: p.speedBoostUntil 
+                });
+              }
             }
 
-            return { ...p, trail: p.trail || [] };
+            return { 
+              ...p, 
+              trail: p.trail || [],
+              hasShield: p.hasShield || false,
+              hasTrailEraser: p.hasTrailEraser || false,
+            };
           });
 
           drawGame();
@@ -911,6 +955,7 @@ const drawGame = () => {
       }
     });
 
+    // Visual effects for player state
     if (player.speedBoostUntil && Date.now() < player.speedBoostUntil) {
       ctx.shadowColor = '#ffff00';
       ctx.shadowBlur = 20;
@@ -921,6 +966,16 @@ const drawGame = () => {
       const brakeIntensity = Math.min(1, brakeDuration * 0.2);
       ctx.shadowColor = '#ff0000';
       ctx.shadowBlur = 15 + (10 * brakeIntensity);
+    }
+    
+    if (player.hasShield) {
+      ctx.shadowColor = '#00ccff';
+      ctx.shadowBlur = 25;
+    }
+    
+    if (player.hasTrailEraser) {
+      ctx.shadowColor = '#ff00ff';
+      ctx.shadowBlur = 20;
     }
 
     if (typeof player.x === 'number' && typeof player.y === 'number' && player.color) {
@@ -965,11 +1020,29 @@ const drawGame = () => {
         ctx.fillStyle = '#fff';
         ctx.font = '12px sans-serif';
         ctx.textAlign = 'center';
+        const nameText = player.name + (player.id === playerId.value ? ' (You)' : '');
         ctx.fillText(
-          player.name + (player.id === playerId.value ? ' (You)' : ''),
+          nameText,
           player.x * cellSize + cellSize / 2,
           player.y * cellSize - 5
         );
+        
+        // Draw power-up indicators next to name
+        const nameWidth = ctx.measureText(nameText).width;
+        let iconOffset = nameWidth / 2 + 8;
+        
+        if (player.hasShield) {
+          ctx.fillStyle = '#00ccff';
+          ctx.font = 'bold 10px sans-serif';
+          ctx.fillText('🛡', player.x * cellSize + cellSize / 2 + iconOffset, player.y * cellSize - 5);
+          iconOffset += 12;
+        }
+        
+        if (player.hasTrailEraser) {
+          ctx.fillStyle = '#ff00ff';
+          ctx.font = 'bold 10px sans-serif';
+          ctx.fillText('✨', player.x * cellSize + cellSize / 2 + iconOffset, player.y * cellSize - 5);
+        }
       }
     }
   });
@@ -979,26 +1052,77 @@ const drawGame = () => {
     if (typeof powerUp.x === 'number' && typeof powerUp.y === 'number') {
       const x = powerUp.x * cellSize;
       const y = powerUp.y * cellSize;
+      const centerX = x + cellSize / 2;
+      const centerY = y + cellSize / 2;
 
-      ctx.shadowColor = '#ffff00';
-      ctx.shadowBlur = 15;
-      ctx.fillStyle = '#ffff00';
-      ctx.beginPath();
-      ctx.arc(x + cellSize / 2, y + cellSize / 2, cellSize / 3, 0, Math.PI * 2);
-      ctx.fill();
+      // Different colors and icons for different power-up types
+      if (powerUp.type === 'speed') {
+        // Yellow lightning bolt
+        ctx.shadowColor = '#ffff00';
+        ctx.shadowBlur = 15;
+        ctx.fillStyle = '#ffff00';
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, cellSize / 3, 0, Math.PI * 2);
+        ctx.fill();
 
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = '#000';
-      ctx.beginPath();
-      ctx.moveTo(x + cellSize/2, y + cellSize/4);
-      ctx.lineTo(x + cellSize/3, y + cellSize/2);
-      ctx.lineTo(x + cellSize/2, y + cellSize/2);
-      ctx.lineTo(x + cellSize/3, y + 3*cellSize/4);
-      ctx.lineTo(x + 2*cellSize/3, y + cellSize/2);
-      ctx.lineTo(x + cellSize/2, y + cellSize/2);
-      ctx.lineTo(x + 2*cellSize/3, y + cellSize/4);
-      ctx.closePath();
-      ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.moveTo(centerX, y + cellSize/4);
+        ctx.lineTo(x + cellSize/3, centerY);
+        ctx.lineTo(centerX, centerY);
+        ctx.lineTo(x + cellSize/3, y + 3*cellSize/4);
+        ctx.lineTo(x + 2*cellSize/3, centerY);
+        ctx.lineTo(centerX, centerY);
+        ctx.lineTo(x + 2*cellSize/3, y + cellSize/4);
+        ctx.closePath();
+        ctx.fill();
+      } else if (powerUp.type === 'shield') {
+        // Blue shield
+        ctx.shadowColor = '#00ccff';
+        ctx.shadowBlur = 15;
+        ctx.fillStyle = '#00ccff';
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, cellSize / 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#000';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        
+        // Shield shape
+        ctx.beginPath();
+        ctx.moveTo(centerX, y + cellSize/4);
+        ctx.lineTo(x + 2*cellSize/3, y + cellSize/3);
+        ctx.lineTo(x + 2*cellSize/3, centerY + cellSize/8);
+        ctx.lineTo(centerX, y + 3*cellSize/4);
+        ctx.lineTo(x + cellSize/3, centerY + cellSize/8);
+        ctx.lineTo(x + cellSize/3, y + cellSize/3);
+        ctx.closePath();
+        ctx.stroke();
+      } else if (powerUp.type === 'trailEraser') {
+        // Purple eraser
+        ctx.shadowColor = '#ff00ff';
+        ctx.shadowBlur = 15;
+        ctx.fillStyle = '#ff00ff';
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, cellSize / 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#000';
+        
+        // Eraser icon (X shape)
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x + cellSize/3, y + cellSize/3);
+        ctx.lineTo(x + 2*cellSize/3, y + 2*cellSize/3);
+        ctx.moveTo(x + 2*cellSize/3, y + cellSize/3);
+        ctx.lineTo(x + cellSize/3, y + 2*cellSize/3);
+        ctx.stroke();
+      }
     }
   });
 
@@ -1114,6 +1238,9 @@ onUnmounted(() => {
   if (youtubePlayer.value) {
     youtubePlayer.value.pauseVideo();
   }
+  if (timeUpdateInterval) {
+    clearInterval(timeUpdateInterval);
+  }
 });
 </script>
 
@@ -1140,6 +1267,49 @@ onUnmounted(() => {
       <p class="instruction">Use Arrow Keys to move</p>
       <p class="instruction">Press opposite direction to brake</p>
       <p class="instruction">Collect ⚡ for speed boost</p>
+      
+      <!-- Boost Status Display (Below controls) -->
+      <div v-if="currentPlayer" class="boost-status-inline">
+        <div class="boost-title">Active Boosts</div>
+        
+        <!-- Debug info (temporary) -->
+        <div style="color: #666; font-size: 10px; margin-bottom: 8px; font-family: monospace;">
+          Speed: {{ currentPlayer.speedBoostUntil ? 'YES (' + Math.ceil((currentPlayer.speedBoostUntil - currentTime) / 1000) + 's)' : 'NO' }} | 
+          Shield: {{ currentPlayer.hasShield ? 'YES' : 'NO' }} | 
+          Eraser: {{ currentPlayer.hasTrailEraser ? 'YES' : 'NO' }}
+        </div>
+        
+        <div class="boost-items">
+          <!-- Speed Boost -->
+          <div 
+            v-if="currentPlayer.speedBoostUntil && currentPlayer.speedBoostUntil > currentTime" 
+            class="boost-item speed"
+          >
+            <span class="boost-icon">⚡</span>
+            <span class="boost-name">Speed Boost</span>
+            <span class="boost-timer">{{ Math.ceil((currentPlayer.speedBoostUntil - currentTime) / 1000) }}s</span>
+          </div>
+          
+          <!-- Shield -->
+          <div v-if="currentPlayer.hasShield" class="boost-item shield">
+            <span class="boost-icon">🛡</span>
+            <span class="boost-name">Shield</span>
+            <span class="boost-status-text">Active</span>
+          </div>
+          
+          <!-- Trail Eraser -->
+          <div v-if="currentPlayer.hasTrailEraser" class="boost-item eraser">
+            <span class="boost-icon">✨</span>
+            <span class="boost-name">Trail Eraser</span>
+            <span class="boost-hint">Press same direction</span>
+          </div>
+          
+          <!-- No boosts message -->
+          <div v-if="!hasAnyBoost" class="no-boosts">
+            No active boosts - collect power-ups!
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Name/Color Dialog -->
@@ -1782,6 +1952,109 @@ onUnmounted(() => {
   box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
   border-radius: 4px;
   overflow: hidden;
+}
+
+.boost-status-inline {
+  margin-top: 20px;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 2px solid #0ff;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+.boost-title {
+  color: #0ff;
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 8px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.boost-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.boost-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-left: 3px solid;
+}
+
+.boost-item.speed {
+  border-left-color: #ffff00;
+  animation: pulse-yellow 1.5s ease-in-out infinite;
+}
+
+.boost-item.shield {
+  border-left-color: #00ccff;
+  animation: pulse-cyan 1.5s ease-in-out infinite;
+}
+
+.boost-item.eraser {
+  border-left-color: #ff00ff;
+  animation: pulse-magenta 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-yellow {
+  0%, 100% { box-shadow: 0 0 5px rgba(255, 255, 0, 0.3); }
+  50% { box-shadow: 0 0 15px rgba(255, 255, 0, 0.6); }
+}
+
+@keyframes pulse-cyan {
+  0%, 100% { box-shadow: 0 0 5px rgba(0, 204, 255, 0.3); }
+  50% { box-shadow: 0 0 15px rgba(0, 204, 255, 0.6); }
+}
+
+@keyframes pulse-magenta {
+  0%, 100% { box-shadow: 0 0 5px rgba(255, 0, 255, 0.3); }
+  50% { box-shadow: 0 0 15px rgba(255, 0, 255, 0.6); }
+}
+
+.boost-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.boost-name {
+  color: #fff;
+  font-size: 13px;
+  flex: 1;
+  font-weight: bold;
+}
+
+.boost-timer {
+  color: #ffff00;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.boost-status-text {
+  color: #00ff00;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.boost-hint {
+  color: #999;
+  font-size: 10px;
+  font-style: italic;
+}
+
+.no-boosts {
+  color: #666;
+  font-size: 12px;
+  text-align: center;
+  padding: 8px;
+  font-style: italic;
 }
 
 canvas {

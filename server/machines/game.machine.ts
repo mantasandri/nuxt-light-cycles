@@ -20,9 +20,10 @@ export type GameEvent =
   | { type: 'TICK' }
   | { type: 'PLAYER_MOVE'; playerId: string; direction: 'up' | 'down' | 'left' | 'right' }
   | { type: 'PLAYER_BRAKE'; playerId: string; braking: boolean }
-  | { type: 'PLAYER_CRASHED'; playerId: string }
+  | { type: 'PLAYER_CRASHED'; playerId: string; shieldAbsorbed?: boolean }
   | { type: 'SPAWN_POWERUP'; powerUp: PowerUp }
-  | { type: 'COLLECT_POWERUP'; playerId: string; powerUpIndex: number }
+  | { type: 'COLLECT_POWERUP'; playerId: string; powerUpIndex: number; powerUpType: PowerUp['type'] }
+  | { type: 'USE_TRAIL_ERASER'; playerId: string }
   | { type: 'GAME_OVER'; winner: string | null }
   | { type: 'RESET' }
   | { type: 'PAUSE' }
@@ -110,6 +111,9 @@ export const gameMachine = setup({
       players: ({ context, event }) => {
         if (event.type !== 'PLAYER_CRASHED') return context.players;
         
+        // Don't mark as crashed if shield absorbed the hit
+        if (event.shieldAbsorbed) return context.players;
+        
         return context.players.map(p =>
           p.id === event.playerId ? { ...p, direction: 'crashed' as const } : p
         );
@@ -137,20 +141,71 @@ export const gameMachine = setup({
         return context.players.map(p => {
           if (p.id === event.playerId) {
             const now = Date.now();
-            if (p.speedBoostUntil && now < p.speedBoostUntil) {
-              // Extend existing boost
+            
+            // Apply different power-up effects based on type
+            if (event.powerUpType === 'speed') {
+              if (p.speedBoostUntil && now < p.speedBoostUntil) {
+                // Extend existing boost
+                console.log(`[GameMachine] Extending speed boost for player ${event.playerId}`);
+                return {
+                  ...p,
+                  speedBoostUntil: p.speedBoostUntil + context.settings.speedBoostDuration,
+                };
+              } else {
+                // New boost
+                console.log(`[GameMachine] Applying speed boost for player ${event.playerId}`);
+                return {
+                  ...p,
+                  speed: 2,
+                  speedBoostUntil: now + context.settings.speedBoostDuration,
+                };
+              }
+            } else if (event.powerUpType === 'shield') {
+              console.log(`[GameMachine] Applying shield for player ${event.playerId}`);
               return {
                 ...p,
-                speedBoostUntil: p.speedBoostUntil + context.settings.speedBoostDuration,
+                hasShield: true,
               };
-            } else {
-              // New boost
+            } else if (event.powerUpType === 'trailEraser') {
+              console.log(`[GameMachine] Applying trail eraser for player ${event.playerId}`);
               return {
                 ...p,
-                speed: 2,
-                speedBoostUntil: now + context.settings.speedBoostDuration,
+                hasTrailEraser: true,
               };
             }
+          }
+          return p;
+        });
+      },
+    }),
+    useTrailEraser: assign({
+      players: ({ context, event }) => {
+        if (event.type !== 'USE_TRAIL_ERASER') return context.players;
+        
+        return context.players.map(p => {
+          if (p.id === event.playerId && p.hasTrailEraser) {
+            // Clear the trail and consume the power-up
+            return {
+              ...p,
+              trail: [],
+              hasTrailEraser: false,
+            };
+          }
+          return p;
+        });
+      },
+    }),
+    consumeShield: assign({
+      players: ({ context, event }) => {
+        if (event.type !== 'PLAYER_CRASHED') return context.players;
+        
+        return context.players.map(p => {
+          if (p.id === event.playerId && event.shieldAbsorbed) {
+            // Shield absorbed the hit, remove it
+            return {
+              ...p,
+              hasShield: false,
+            };
           }
           return p;
         });
@@ -176,6 +231,8 @@ export const gameMachine = setup({
           isBraking: false,
           brakeStartTime: null,
           isReady: false,
+          hasShield: false,
+          hasTrailEraser: false,
         })),
     }),
   },
@@ -215,7 +272,7 @@ export const gameMachine = setup({
           actions: 'updatePlayerBrake',
         },
         PLAYER_CRASHED: {
-          actions: 'markPlayerCrashed',
+          actions: ['markPlayerCrashed', 'consumeShield'],
           // Check if game should end after crash
         },
         SPAWN_POWERUP: {
@@ -223,6 +280,9 @@ export const gameMachine = setup({
         },
         COLLECT_POWERUP: {
           actions: ['removePowerUp', 'applyPowerUpToPlayer'],
+        },
+        USE_TRAIL_ERASER: {
+          actions: 'useTrailEraser',
         },
         GAME_OVER: {
           target: 'gameOver',

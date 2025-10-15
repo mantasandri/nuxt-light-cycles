@@ -538,7 +538,7 @@ interface GameSettings {
 ### Potential Features
 - [ ] Tournament bracket system
 - [ ] Leaderboard and statistics
-- [ ] More power-up types (shield, teleport, trail eraser)
+- [x] More power-up types (shield, teleport, trail eraser)
 - [ ] Custom game modes (time limit, elimination rounds)
 - [ ] Sound effects and background music
 - [ ] Chat system

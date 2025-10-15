@@ -21,6 +21,8 @@ export interface GamePlayer {
   lastDirection?: string;
   gameId: string;
   avatar?: string;
+  hasShield: boolean;
+  hasTrailEraser: boolean;
 }
 
 export interface Spectator {
@@ -33,7 +35,7 @@ export interface Spectator {
 export interface PowerUp {
   x: number;
   y: number;
-  type: 'speed';
+  type: 'speed' | 'shield' | 'trailEraser';
 }
 
 export interface GameSettings {

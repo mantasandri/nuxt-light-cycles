@@ -250,7 +250,7 @@ const simulateTick = (tick: number) => {
         player.direction = 'crashed';
       }
     } else if (event.type === 'powerUpSpawned') {
-      gameState.value.powerUps.push({ x: event.payload.x, y: event.payload.y });
+      gameState.value.powerUps.push({ x: event.payload.x, y: event.payload.y, type: event.payload.type || 'speed' });
     } else if (event.type === 'powerUpCollected') {
       const index = event.payload.powerUpIndex;
       if (index >= 0 && index < gameState.value.powerUps.length) {
@@ -299,15 +299,24 @@ const drawGame = () => {
     const x = powerUp.x * cellSize + cellSize / 2;
     const y = powerUp.y * cellSize + cellSize / 2;
     
+    // Different colors for different power-up types
+    let color = '#ff0'; // speed (yellow)
+    if (powerUp.type === 'shield') {
+      color = '#0cf'; // shield (cyan)
+    } else if (powerUp.type === 'trailEraser') {
+      color = '#f0f'; // trail eraser (magenta)
+    }
+    
     // Glow effect
     const gradient = ctx.createRadialGradient(x, y, 0, x, y, cellSize);
-    gradient.addColorStop(0, 'rgba(255, 255, 0, 0.4)');
-    gradient.addColorStop(1, 'rgba(255, 255, 0, 0)');
+    const rgb = color === '#ff0' ? '255, 255, 0' : color === '#0cf' ? '0, 204, 255' : '255, 0, 255';
+    gradient.addColorStop(0, `rgba(${rgb}, 0.4)`);
+    gradient.addColorStop(1, `rgba(${rgb}, 0)`);
     ctx.fillStyle = gradient;
     ctx.fillRect(powerUp.x * cellSize - cellSize, powerUp.y * cellSize - cellSize, cellSize * 3, cellSize * 3);
     
     // Power-up circle
-    ctx.fillStyle = '#ff0';
+    ctx.fillStyle = color;
     ctx.beginPath();
     ctx.arc(x, y, cellSize / 3, 0, Math.PI * 2);
     ctx.fill();

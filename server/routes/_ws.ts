@@ -166,22 +166,35 @@ const broadcastGameState = (lobbyId: string) => {
     return;
   }
   
+  const playerData = gameContext.players.map(p => {
+    const data = {
+      id: p.id,
+      name: p.name,
+      x: p.x,
+      y: p.y,
+      direction: p.direction,
+      color: p.color,
+      trail: p.trail,
+      isReady: p.isReady,
+      speed: p.speed,
+      speedBoostUntil: p.speedBoostUntil,
+      isBraking: p.isBraking,
+      hasShield: p.hasShield,
+      hasTrailEraser: p.hasTrailEraser,
+    };
+    
+    // Log when player has boosts
+    if (p.hasShield || p.hasTrailEraser) {
+      console.log(`[Broadcast] Player ${p.id} boosts:`, { hasShield: p.hasShield, hasTrailEraser: p.hasTrailEraser });
+    }
+    
+    return data;
+  });
+  
   broadcastToLobby(lobbyId, {
     type: 'gameState',
     payload: {
-      players: gameContext.players.map(p => ({
-        id: p.id,
-        name: p.name,
-        x: p.x,
-        y: p.y,
-        direction: p.direction,
-        color: p.color,
-        trail: p.trail,
-        isReady: p.isReady,
-        speed: p.speed,
-        speedBoostUntil: p.speedBoostUntil,
-        isBraking: p.isBraking,
-      })),
+      players: playerData,
       powerUps: gameContext.powerUps,
       obstacles: gameContext.obstacles,
       gridSize: gameContext.settings.gridSize,
@@ -551,9 +564,13 @@ const startGameLoop = (lobbyId: string) => {
         const isPowerUp = context.powerUps.some(p => p.x === x && p.y === y);
         
         if (!isObstacle && !isTrail && !isPowerUp && lobby.gameActor) {
+          // Randomly select power-up type
+          const powerUpTypes: Array<'speed' | 'shield' | 'trailEraser'> = ['speed', 'shield', 'trailEraser'];
+          const randomType = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
+          
           lobby.gameActor.send({ 
             type: 'SPAWN_POWERUP', 
-            powerUp: { x, y, type: 'speed' }
+            powerUp: { x, y, type: randomType }
           });
           spawned = true;
           
@@ -561,7 +578,7 @@ const startGameLoop = (lobbyId: string) => {
           if (recorder) {
             recorder.recordEvent({
               type: 'powerUpSpawned',
-              payload: { x, y, type: 'speed' },
+              payload: { x, y, type: randomType },
             });
           }
         }
@@ -619,38 +636,62 @@ const startGameLoop = (lobbyId: string) => {
         const obstacleCollision = context.obstacles.includes(currentPos);
 
         if (wallCollision || trailCollision || obstacleCollision) {
-          if (lobby.gameActor) {
-            lobby.gameActor.send({ type: 'PLAYER_CRASHED', playerId: player.id });
-          }
-          
-          // Record player crash
-          if (recorder) {
-            recorder.recordEvent({
+          // Check if player has shield
+          if (player.hasShield && lobby.gameActor) {
+            // Shield absorbs the hit
+            lobby.gameActor.send({ 
+              type: 'PLAYER_CRASHED', 
+              playerId: player.id, 
+              shieldAbsorbed: true 
+            });
+            
+            // Broadcast shield absorption
+            broadcastToLobby(lobbyId, {
+              type: 'shieldAbsorbed',
+              payload: { playerId: player.id },
+            });
+            
+            // Don't mark as crashed, just continue
+            player.trail.push(currentPos);
+          } else {
+            // No shield - player crashes
+            if (lobby.gameActor) {
+              lobby.gameActor.send({ type: 'PLAYER_CRASHED', playerId: player.id });
+            }
+            
+            // Record player crash
+            if (recorder) {
+              recorder.recordEvent({
+                type: 'playerCrashed',
+                payload: { playerId: player.id },
+              });
+            }
+            
+            broadcastToLobby(lobbyId, {
               type: 'playerCrashed',
               payload: { playerId: player.id },
             });
+            break;
           }
-          
-          broadcastToLobby(lobbyId, {
-            type: 'playerCrashed',
-            payload: { playerId: player.id },
-          });
-          break;
         } else {
           // Check for power-up collection
           const powerUpIndex = context.powerUps.findIndex(p => p.x === player.x && p.y === player.y);
           if (powerUpIndex !== -1 && lobby.gameActor) {
+            const powerUpType = context.powerUps[powerUpIndex].type;
+            console.log(`[Server] Player ${player.id} collected ${powerUpType} power-up`);
+            
             lobby.gameActor.send({ 
               type: 'COLLECT_POWERUP', 
               playerId: player.id, 
-              powerUpIndex 
+              powerUpIndex,
+              powerUpType
             });
             
             // Record power-up collection
             if (recorder) {
               recorder.recordEvent({
                 type: 'powerUpCollected',
-                payload: { playerId: player.id, powerUpIndex },
+                payload: { playerId: player.id, powerUpIndex, powerUpType },
               });
             }
           }
@@ -916,6 +957,8 @@ export default defineWebSocketHandler({
         isBraking: false,
         brakeStartTime: null,
         gameId: newLobbyId,
+        hasShield: false,
+        hasTrailEraser: false,
       };
       
       // Add player to lobby
@@ -939,6 +982,8 @@ export default defineWebSocketHandler({
             isBraking: false,
             brakeStartTime: null,
             gameId: newLobbyId,
+            hasShield: false,
+            hasTrailEraser: false,
           };
           lobbyService.addPlayerToLobby(newLobbyId, aiPlayer);
         }
@@ -1005,6 +1050,8 @@ export default defineWebSocketHandler({
         isBraking: false,
         brakeStartTime: null,
         gameId: targetLobbyId,
+        hasShield: false,
+        hasTrailEraser: false,
       };
       
       // Add player to lobby
@@ -1331,20 +1378,48 @@ export default defineWebSocketHandler({
         
         const gameSnapshot = lobby.gameActor.getSnapshot();
         if (gameSnapshot.matches('playing')) {
-          lobby.gameActor.send({
-            type: 'PLAYER_MOVE',
-            playerId,
-            direction: data.payload.direction,
-          });
+          const context = gameSnapshot.context;
+          const player = context.players.find(p => p.id === playerId);
           
-          // Record player move action
-          const recorder = replayRecorders.get(lobbyId);
-          if (recorder) {
-            recorder.recordAction({
+          // Check if player is pressing same direction (activate trail eraser)
+          if (player && player.hasTrailEraser && player.lastDirection === data.payload.direction) {
+            // Fire trail eraser!
+            lobby.gameActor.send({
+              type: 'USE_TRAIL_ERASER',
               playerId,
-              action: 'move',
-              payload: { direction: data.payload.direction },
             });
+            
+            // Record trail eraser use
+            const recorder = replayRecorders.get(lobbyId);
+            if (recorder) {
+              recorder.recordAction({
+                playerId,
+                action: 'useTrailEraser',
+                payload: {},
+              });
+            }
+            
+            broadcastToLobby(lobbyId, {
+              type: 'trailEraserUsed',
+              payload: { playerId },
+            });
+          } else {
+            // Normal move
+            lobby.gameActor.send({
+              type: 'PLAYER_MOVE',
+              playerId,
+              direction: data.payload.direction,
+            });
+            
+            // Record player move action
+            const recorder = replayRecorders.get(lobbyId);
+            if (recorder) {
+              recorder.recordAction({
+                playerId,
+                action: 'move',
+                payload: { direction: data.payload.direction },
+              });
+            }
           }
         }
         break;
