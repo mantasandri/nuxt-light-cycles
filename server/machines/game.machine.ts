@@ -146,14 +146,12 @@ export const gameMachine = setup({
             if (event.powerUpType === 'speed') {
               if (p.speedBoostUntil && now < p.speedBoostUntil) {
                 // Extend existing boost
-                console.log(`[GameMachine] Extending speed boost for player ${event.playerId}`);
                 return {
                   ...p,
                   speedBoostUntil: p.speedBoostUntil + context.settings.speedBoostDuration,
                 };
               } else {
                 // New boost
-                console.log(`[GameMachine] Applying speed boost for player ${event.playerId}`);
                 return {
                   ...p,
                   speed: 2,
@@ -161,13 +159,11 @@ export const gameMachine = setup({
                 };
               }
             } else if (event.powerUpType === 'shield') {
-              console.log(`[GameMachine] Applying shield for player ${event.playerId}`);
               return {
                 ...p,
                 hasShield: true,
               };
             } else if (event.powerUpType === 'trailEraser') {
-              console.log(`[GameMachine] Applying trail eraser for player ${event.playerId}`);
               return {
                 ...p,
                 hasTrailEraser: true,

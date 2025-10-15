@@ -461,14 +461,6 @@ const connectWebSocket = () => {
 
             if (p.id === playerId.value) {
               currentDirection.value = p.direction;
-              // Debug log for current player
-              if (p.hasShield || p.hasTrailEraser) {
-                console.log('[Client] Player boosts:', { 
-                  hasShield: p.hasShield, 
-                  hasTrailEraser: p.hasTrailEraser,
-                  speedBoostUntil: p.speedBoostUntil 
-                });
-              }
             }
 
             return { 
@@ -1271,14 +1263,9 @@ onUnmounted(() => {
       <!-- Boost Status Display (Below controls) -->
       <div v-if="currentPlayer" class="boost-status-inline">
         <div class="boost-title">Active Boosts</div>
-        
-        <!-- Debug info (temporary) -->
-        <div style="color: #666; font-size: 10px; margin-bottom: 8px; font-family: monospace;">
-          Speed: {{ currentPlayer.speedBoostUntil ? 'YES (' + Math.ceil((currentPlayer.speedBoostUntil - currentTime) / 1000) + 's)' : 'NO' }} | 
-          Shield: {{ currentPlayer.hasShield ? 'YES' : 'NO' }} | 
-          Eraser: {{ currentPlayer.hasTrailEraser ? 'YES' : 'NO' }}
+        <div style="font-size: 10px; color: #666; margin: 5px 0;">
+          (Speed: {{ currentPlayer.speedBoostUntil ? 'YES' : 'NO' }}, Shield: {{ currentPlayer.hasShield ? 'YES' : 'NO' }}, Eraser: {{ currentPlayer.hasTrailEraser ? 'YES' : 'NO' }})
         </div>
-        
         <div class="boost-items">
           <!-- Speed Boost -->
           <div 

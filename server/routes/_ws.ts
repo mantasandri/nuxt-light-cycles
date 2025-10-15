@@ -166,35 +166,24 @@ const broadcastGameState = (lobbyId: string) => {
     return;
   }
   
-  const playerData = gameContext.players.map(p => {
-    const data = {
-      id: p.id,
-      name: p.name,
-      x: p.x,
-      y: p.y,
-      direction: p.direction,
-      color: p.color,
-      trail: p.trail,
-      isReady: p.isReady,
-      speed: p.speed,
-      speedBoostUntil: p.speedBoostUntil,
-      isBraking: p.isBraking,
-      hasShield: p.hasShield,
-      hasTrailEraser: p.hasTrailEraser,
-    };
-    
-    // Log when player has boosts
-    if (p.hasShield || p.hasTrailEraser) {
-      console.log(`[Broadcast] Player ${p.id} boosts:`, { hasShield: p.hasShield, hasTrailEraser: p.hasTrailEraser });
-    }
-    
-    return data;
-  });
-  
   broadcastToLobby(lobbyId, {
     type: 'gameState',
     payload: {
-      players: playerData,
+      players: gameContext.players.map(p => ({
+        id: p.id,
+        name: p.name,
+        x: p.x,
+        y: p.y,
+        direction: p.direction,
+        color: p.color,
+        trail: p.trail,
+        isReady: p.isReady,
+        speed: p.speed,
+        speedBoostUntil: p.speedBoostUntil,
+        isBraking: p.isBraking,
+        hasShield: p.hasShield,
+        hasTrailEraser: p.hasTrailEraser,
+      })),
       powerUps: gameContext.powerUps,
       obstacles: gameContext.obstacles,
       gridSize: gameContext.settings.gridSize,
@@ -678,8 +667,6 @@ const startGameLoop = (lobbyId: string) => {
           const powerUpIndex = context.powerUps.findIndex(p => p.x === player.x && p.y === player.y);
           if (powerUpIndex !== -1 && lobby.gameActor) {
             const powerUpType = context.powerUps[powerUpIndex].type;
-            console.log(`[Server] Player ${player.id} collected ${powerUpType} power-up`);
-            
             lobby.gameActor.send({ 
               type: 'COLLECT_POWERUP', 
               playerId: player.id, 
