@@ -517,7 +517,18 @@ const startGameLoop = (lobbyId: string) => {
     // AI decision making - update AI player directions before movement
     context.players.forEach(player => {
       if (player.id.startsWith('ai-') && player.direction !== 'crashed') {
-        player.direction = getAIMove(player, context);
+        const newDirection = getAIMove(player, context);
+        if (newDirection !== player.direction) {
+          // Record AI direction change
+          if (recorder) {
+            recorder.recordAction({
+              playerId: player.id,
+              action: 'move',
+              payload: { direction: newDirection },
+            });
+          }
+          player.direction = newDirection;
+        }
       }
     });
 
