@@ -12,8 +12,6 @@ import type {
   UserReplayList,
 } from '../types/replay.types';
 import { nanoid } from 'nanoid';
-import { promises as fs } from 'fs';
-import { join } from 'path';
 
 class ReplayRecorder {
   private actions: PlayerAction[] = [];
@@ -107,35 +105,18 @@ class ReplayRecorder {
 }
 
 class ReplayServiceClass {
-  private replayStoragePath: string;
-  private userStoragePath: string;
-
-  constructor() {
-    // Store replays in server/api/replays directory
-    this.replayStoragePath = join(process.cwd(), 'server', 'api', 'replays', 'data');
-    this.userStoragePath = join(process.cwd(), 'server', 'api', 'replays', 'users');
-    this.initializeStorage();
-  }
-
-  private async initializeStorage() {
-    try {
-      await fs.mkdir(this.replayStoragePath, { recursive: true });
-      await fs.mkdir(this.userStoragePath, { recursive: true });
-    } catch (error) {
-      console.error('Failed to initialize replay storage:', error);
-    }
-  }
-
   async saveReplayToFile(replayData: ReplayData): Promise<void> {
-    const filePath = join(this.replayStoragePath, `${replayData.metadata.replayId}.json`);
-    await fs.writeFile(filePath, JSON.stringify(replayData, null, 2), 'utf-8');
+    const storage = useStorage();
+    const key = `replays:data:${replayData.metadata.replayId}`;
+    await storage.setItem(key, replayData);
   }
 
   async loadReplay(replayId: string): Promise<ReplayData | null> {
     try {
-      const filePath = join(this.replayStoragePath, `${replayId}.json`);
-      const content = await fs.readFile(filePath, 'utf-8');
-      return JSON.parse(content) as ReplayData;
+      const storage = useStorage();
+      const key = `replays:data:${replayId}`;
+      const data = await storage.getItem<ReplayData>(key);
+      return data;
     } catch (error) {
       console.error(`Failed to load replay ${replayId}:`, error);
       return null;
@@ -143,18 +124,23 @@ class ReplayServiceClass {
   }
 
   async deleteReplay(replayId: string): Promise<void> {
-    const filePath = join(this.replayStoragePath, `${replayId}.json`);
-    await fs.unlink(filePath);
+    const storage = useStorage();
+    const key = `replays:data:${replayId}`;
+    await storage.removeItem(key);
   }
 
   async addReplayToUser(userId: string, replayId: string, metadata: ReplayMetadata): Promise<void> {
-    const userFilePath = join(this.userStoragePath, `${userId}.json`);
+    const storage = useStorage();
+    const userKey = `replays:users:${userId}`;
     
     let userReplays: UserReplayList;
     
     try {
-      const content = await fs.readFile(userFilePath, 'utf-8');
-      userReplays = JSON.parse(content);
+      const data = await storage.getItem<UserReplayList>(userKey);
+      userReplays = data || {
+        userId,
+        replays: [],
+      };
     } catch {
       // User file doesn't exist, create new one
       userReplays = {
@@ -183,30 +169,31 @@ class ReplayServiceClass {
       }
     }
 
-    await fs.writeFile(userFilePath, JSON.stringify(userReplays, null, 2), 'utf-8');
+    await storage.setItem(userKey, userReplays);
   }
 
   async getUserReplays(userId: string): Promise<UserReplayList['replays']> {
     try {
-      const userFilePath = join(this.userStoragePath, `${userId}.json`);
-      const content = await fs.readFile(userFilePath, 'utf-8');
-      const userReplays: UserReplayList = JSON.parse(content);
-      return userReplays.replays;
+      const storage = useStorage();
+      const userKey = `replays:users:${userId}`;
+      const userReplays = await storage.getItem<UserReplayList>(userKey);
+      return userReplays?.replays || [];
     } catch {
       return [];
     }
   }
 
   async removeReplayFromUser(userId: string, replayId: string): Promise<void> {
-    const userFilePath = join(this.userStoragePath, `${userId}.json`);
+    const storage = useStorage();
+    const userKey = `replays:users:${userId}`;
     
     try {
-      const content = await fs.readFile(userFilePath, 'utf-8');
-      const userReplays: UserReplayList = JSON.parse(content);
+      const userReplays = await storage.getItem<UserReplayList>(userKey);
       
-      userReplays.replays = userReplays.replays.filter(r => r.replayId !== replayId);
-      
-      await fs.writeFile(userFilePath, JSON.stringify(userReplays, null, 2), 'utf-8');
+      if (userReplays) {
+        userReplays.replays = userReplays.replays.filter(r => r.replayId !== replayId);
+        await storage.setItem(userKey, userReplays);
+      }
       
       // Delete the replay file
       await this.deleteReplay(replayId);
