@@ -1,0 +1,1734 @@
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted, nextTick } from 'vue';
+import { usePlayerSettings, AVATAR_OPTIONS } from '~/composables/usePlayerSettings';
+import LobbyPanel from '~/components/LobbyPanel.vue';
+import LobbyBrowser from '~/components/LobbyBrowser.vue';
+import CreateLobbyDialog from '~/components/CreateLobbyDialog.vue';
+
+interface PowerUp {
+  x: number;
+  y: number;
+  type: 'speed';
+}
+
+interface Player {
+  id: string;
+  x: number;
+  y: number;
+  direction: 'up' | 'down' | 'left' | 'right' | 'crashed';
+  color: string;
+  trail: string[];
+  isReady: boolean;
+  name: string;
+  speed: number;
+  speedBoostUntil: number | null;
+  isBraking: boolean;
+  brakeStartTime: number | null;
+  gameId: string;
+}
+
+interface LobbySettings {
+  isPrivate: boolean;
+  gridSize: number;
+  maxPlayers: number;
+  allowSpectators: boolean;
+  enableAI?: boolean;
+  aiPlayerCount?: number;
+}
+
+interface LobbyState {
+  lobbyId: string;
+  state: string;
+  players: Array<{
+    id: string;
+    name: string;
+    color: string;
+    isReady: boolean;
+  }>;
+  spectators?: Array<{
+    id: string;
+    name: string;
+    color: string;
+  }>;
+  settings: LobbySettings;
+  hostId: string | null;
+  countdownRemaining: number | null;
+  roundNumber: number;
+}
+
+// Lobby info interface (used for type checking)
+interface _LobbyInfo {
+  lobbyId: string;
+  playerCount: number;
+  maxPlayers: number;
+  gridSize: number;
+  isPrivate: boolean;
+  hostName: string;
+  state: string;
+}
+
+// Player settings
+const { settings: playerSettings, isConfigured, loadSettings, saveSettings } = usePlayerSettings();
+
+// UI State
+const showNameDialog = ref(false);
+const showBrowser = ref(false);
+const showLobby = ref(false);
+const showCreateDialog = ref(false);
+const showDebug = ref(false);
+
+// WebSocket
+const ws = ref<WebSocket | null>(null);
+const playerId = ref<string | null>(null);
+const lobbyId = ref<string | null>(null);
+const reconnectToken = ref<string | null>(null);
+const isSpectator = ref(false);
+const isReconnecting = ref(false);
+const reconnectAttempts = ref(0);
+
+// Game state
+const gamePlayers = ref<Player[]>([]);
+const currentGridSize = ref(20);
+const gameState = ref<'waiting' | 'starting' | 'playing' | 'finished'>('waiting');
+const countdown = ref<number | null>(null);
+const isReady = ref(false);
+const lobbyState = ref<LobbyState | null>(null);
+const crashedPlayers = ref<string[]>([]);
+const winner = ref<{ id: string; color: string } | null>(null);
+const powerUps = ref<PowerUp[]>([]);
+const obstacles = ref<string[]>([]);
+
+// Canvas
+const canvasRef = ref<HTMLCanvasElement | null>(null);
+let ctx: CanvasRenderingContext2D | null = null;
+const cellSize = 20;
+
+// Controls
+const isBraking = ref(false);
+const currentDirection = ref<string>('');
+
+// Lobby browser
+const lobbyBrowser = ref<InstanceType<typeof LobbyBrowser> | null>(null);
+
+// Temporary name/color for dialog
+const tempName = ref('');
+const tempColor = ref('hsl(180, 90%, 60%)');
+const tempColorHex = ref('#00ffff');
+const tempAvatar = ref('recognizer');
+
+// YouTube player
+interface YouTubePlayer {
+  playVideo: () => void;
+  pauseVideo: () => void;
+  setVolume: (volume: number) => void;
+}
+
+interface YouTubeEvent {
+  target: YouTubePlayer;
+  data: number;
+}
+
+const youtubePlayer = ref<YouTubePlayer | null>(null);
+const isYoutubePlaying = ref(false);
+
+const hslToHex = (h: number, s: number, l: number) => {
+  l /= 100;
+  const a = s * Math.min(l, 1 - l) / 100;
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+};
+
+const hexToHSL = (hex: string) => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return null;
+  
+  const r = parseInt(result[1] || '0', 16) / 255;
+  const g = parseInt(result[2] || '0', 16) / 255;
+  const b = parseInt(result[3] || '0', 16) / 255;
+  
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+
+  return `hsl(${Math.round(h * 360)}, ${Math.round(s * 100)}%, ${Math.round(l * 100)}%)`;
+};
+
+const generateRandomColor = () => {
+  const hue = Math.floor(Math.random() * 360);
+  const saturation = Math.floor(Math.random() * 20) + 80;
+  const lightness = Math.floor(Math.random() * 20) + 50;
+  const hsl = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+  const hex = hslToHex(hue, saturation, lightness);
+  return { hsl, hex };
+};
+
+// Initialize or show settings dialog
+onMounted(() => {
+  loadSettings();
+  
+  if (!isConfigured.value) {
+    // Generate random color for first-time users
+    const color = generateRandomColor();
+    tempColor.value = color.hsl;
+    tempColorHex.value = color.hex;
+    showNameDialog.value = true;
+  } else {
+    // Use saved settings
+    tempName.value = playerSettings.value.name || '';
+    tempColor.value = playerSettings.value.color || 'hsl(180, 90%, 60%)';
+    tempColorHex.value = playerSettings.value.colorHex || '#00ffff';
+    connectWebSocket();
+  }
+});
+
+const savePlayerSettings = () => {
+  if (!tempName.value.trim()) return;
+  
+  saveSettings({
+    name: tempName.value.trim(),
+    color: tempColor.value,
+    colorHex: tempColorHex.value,
+    avatar: tempAvatar.value,
+  });
+  
+  showNameDialog.value = false;
+  connectWebSocket();
+};
+
+const changePlayerSettings = () => {
+  showBrowser.value = false;
+  showNameDialog.value = true;
+  tempName.value = playerSettings.value.name || '';
+  tempColor.value = playerSettings.value.color || 'hsl(180, 90%, 60%)';
+  tempColorHex.value = playerSettings.value.colorHex || '#00ffff';
+  tempAvatar.value = playerSettings.value.avatar || 'recognizer';
+};
+
+const handleColorSquareClick = () => {
+  if (typeof window !== 'undefined') {
+    const input = window.document.querySelector('.hidden-color-input') as HTMLInputElement;
+    input?.click();
+  }
+};
+
+const connectWebSocket = () => {
+  if (ws.value) {
+    ws.value.close();
+  }
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${window.location.host}/_ws`;
+  const socket = new WebSocket(wsUrl);
+
+  socket.onopen = () => {
+    console.log('WebSocket connected');
+    ws.value = socket;
+    
+    // Try to reconnect if we have a token
+    if (reconnectToken.value && isReconnecting.value) {
+      console.log('[Reconnection] Attempting to restore session...');
+      socket.send(JSON.stringify({
+        type: 'reconnect',
+        payload: { reconnectToken: reconnectToken.value },
+      }));
+    }
+  };
+
+  socket.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      // Uncomment for debugging: console.log('Received:', data.type);
+
+      switch (data.type) {
+        case 'connected': {
+          playerId.value = data.payload.playerId;
+          reconnectToken.value = data.payload.reconnectToken;
+          isReconnecting.value = false;
+          reconnectAttempts.value = 0;
+          
+          // Save reconnection token to localStorage
+          if (reconnectToken.value) {
+            localStorage.setItem('reconnectToken', reconnectToken.value);
+          }
+          
+          if (lobbyBrowser.value) {
+            lobbyBrowser.value.updateLobbies(data.payload.lobbies);
+          }
+          showBrowser.value = true;
+          break;
+        }
+
+        case 'reconnected': {
+          console.log('[Reconnection] Successfully restored session');
+          playerId.value = data.payload.playerId;
+          lobbyId.value = data.payload.lobbyId;
+          isSpectator.value = data.payload.isSpectator;
+          isReconnecting.value = false;
+          reconnectAttempts.value = 0;
+          
+          // Show appropriate UI based on state
+          if (lobbyId.value) {
+            showBrowser.value = false;
+            showLobby.value = true;
+          } else {
+            showBrowser.value = true;
+          }
+          break;
+        }
+
+        case 'lobbyList': {
+          if (lobbyBrowser.value) {
+            lobbyBrowser.value.updateLobbies(data.payload.lobbies);
+          }
+          break;
+        }
+
+        case 'lobbyJoined': {
+          lobbyId.value = data.payload.lobbyId;
+          currentGridSize.value = data.payload.gridSize;
+          isSpectator.value = data.payload.isSpectator || false;
+          showBrowser.value = false;
+          showCreateDialog.value = false;
+          
+          if (canvasRef.value) {
+            canvasRef.value.width = currentGridSize.value * cellSize;
+            canvasRef.value.height = currentGridSize.value * cellSize;
+            if (ctx) {
+              ctx.imageSmoothingEnabled = false;
+            }
+          }
+          break;
+        }
+
+        case 'lobbyState': {
+          lobbyState.value = data.payload;
+          
+          if (data.payload.state === 'starting') {
+            gameState.value = 'starting';
+            showLobby.value = true; // Keep lobby visible to show countdown
+            
+            // Initialize canvas if not already done
+            if (canvasRef.value && currentGridSize.value > 0) {
+              canvasRef.value.width = currentGridSize.value * cellSize;
+              canvasRef.value.height = currentGridSize.value * cellSize;
+              if (ctx) {
+                ctx.imageSmoothingEnabled = false;
+              }
+              // Draw empty game board during countdown
+              drawGame();
+            }
+          } else if (data.payload.state === 'inGame') {
+            gameState.value = 'playing';
+            showLobby.value = false;
+            
+            // Make sure canvas is properly sized when game starts
+            if (canvasRef.value && currentGridSize.value > 0) {
+              canvasRef.value.width = currentGridSize.value * cellSize;
+              canvasRef.value.height = currentGridSize.value * cellSize;
+              if (ctx) {
+                ctx.imageSmoothingEnabled = false;
+              }
+              drawGame();
+            }
+          } else if (data.payload.state === 'waiting') {
+            gameState.value = 'waiting';
+            showLobby.value = true;
+          }
+          
+          // Update ready state
+          const currentPlayerInLobby = data.payload.players.find((p: { id: string }) => p.id === playerId.value);
+          if (currentPlayerInLobby) {
+            isReady.value = currentPlayerInLobby.isReady;
+          }
+          break;
+        }
+
+        case 'gameState': {
+          const state = data.payload;
+          
+          gameState.value = state.gameState;
+          currentGridSize.value = state.gridSize;
+          powerUps.value = state.powerUps;
+          obstacles.value = state.obstacles;
+          
+          gamePlayers.value = state.players.map((p: Player) => {
+            const isNewlyCrashed = p.direction === 'crashed' && !crashedPlayers.value.includes(p.id);
+            if (isNewlyCrashed) {
+              crashedPlayers.value.push(p.id);
+            }
+
+            if (p.id === playerId.value) {
+              currentDirection.value = p.direction;
+            }
+
+            return { ...p, trail: p.trail || [] };
+          });
+
+          drawGame();
+          break;
+        }
+
+        case 'countdown':
+          countdown.value = data.payload.count;
+          gameState.value = 'starting';
+          showLobby.value = false;
+          drawGame();
+          break;
+
+        case 'playerCrashed': {
+          const crashedPlayerId = data.payload.playerId;
+          const crashedPlayer = gamePlayers.value.find(p => p.id === crashedPlayerId);
+          if (crashedPlayer) {
+            crashedPlayer.direction = 'crashed';
+            crashedPlayers.value.push(crashedPlayerId);
+          }
+          drawGame();
+          break;
+        }
+
+        case 'gameOver':
+          console.log('[Client] Game Over received:', data.payload);
+          if (data.payload.draw) {
+            winner.value = null;
+          } else {
+            winner.value = {
+              id: data.payload.winner,
+              color: data.payload.winnerColor
+            };
+          }
+          gameState.value = 'finished';
+          isReady.value = false;
+          countdown.value = null;
+          showLobby.value = false; // Hide lobby panel so game over screen shows
+          console.log('[Client] Game state set to finished, showLobby:', showLobby.value, 'winner:', winner.value);
+          drawGame();
+          break;
+
+        case 'lobbyClosed': {
+          console.log('[Lobby] Lobby closed:', data.payload.message);
+          
+          // Reset state
+          lobbyId.value = null;
+          isSpectator.value = false;
+          lobbyState.value = null;
+          gameState.value = 'waiting';
+          showLobby.value = false;
+          showBrowser.value = true;
+          
+          // Show notification to user
+          alert(data.payload.message || 'Lobby has been closed.');
+          break;
+        }
+
+        case 'error':
+          console.error('Server error:', data.payload.message);
+          break;
+      }
+    } catch (error) {
+      console.error('Error processing message:', error);
+    }
+  };
+
+  socket.onclose = () => {
+    console.log('WebSocket disconnected');
+    ws.value = null;
+    
+    // Attempt reconnection
+    if (reconnectToken.value && reconnectAttempts.value < 5) {
+      isReconnecting.value = true;
+      reconnectAttempts.value++;
+      const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.value - 1), 10000);
+      console.log(`[Reconnection] Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts.value}/5)`);
+      setTimeout(connectWebSocket, delay);
+    } else {
+      // Failed to reconnect or no token, start fresh
+      gameState.value = 'waiting';
+      showBrowser.value = false;
+      lobbyId.value = null;
+      isSpectator.value = false;
+      isReconnecting.value = false;
+      reconnectAttempts.value = 0;
+      setTimeout(connectWebSocket, 3000);
+    }
+  };
+
+  socket.onerror = (error) => {
+    console.error('WebSocket error:', error);
+  };
+};
+
+// Request lobby list (for future use with manual refresh)
+const _requestLobbyList = () => {
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  
+  ws.value.send(JSON.stringify({
+    type: 'getLobbyList',
+    payload: {},
+  }));
+};
+
+const handleJoinLobby = (targetLobbyId: string) => {
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  
+  ws.value.send(JSON.stringify({
+    type: 'joinLobby',
+    payload: {
+      lobbyId: targetLobbyId,
+      playerName: playerSettings.value.name,
+      playerColor: playerSettings.value.color,
+    },
+  }));
+};
+
+const handleSpectateGame = (targetLobbyId: string) => {
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  
+  ws.value.send(JSON.stringify({
+    type: 'joinLobbyAsSpectator',
+    payload: {
+      lobbyId: targetLobbyId,
+      playerName: playerSettings.value.name,
+      playerColor: playerSettings.value.color,
+    },
+  }));
+};
+
+const handleCreateLobby = (settings: LobbySettings) => {
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  
+  ws.value.send(JSON.stringify({
+    type: 'createLobby',
+    payload: {
+      settings,
+      playerName: playerSettings.value.name,
+      playerColor: playerSettings.value.color,
+    },
+  }));
+};
+
+const toggleReady = () => {
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN || !playerId.value) return;
+
+  const newReadyState = !isReady.value;
+  isReady.value = newReadyState;
+  
+  ws.value.send(JSON.stringify({
+    type: 'ready',
+    payload: { ready: newReadyState }
+  }));
+};
+
+const updateLobbySettings = (settings: Partial<LobbySettings>) => {
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+
+  ws.value.send(JSON.stringify({
+    type: 'updateSettings',
+    payload: { settings }
+  }));
+};
+
+const handlePlayAgain = () => {
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  
+  // Reset game state
+  gameState.value = 'waiting';
+  winner.value = null;
+  crashedPlayers.value = [];
+  gamePlayers.value = [];
+  isReady.value = false;
+  countdown.value = null;
+  
+  // Show lobby panel again
+  showLobby.value = true;
+  
+  // Tell server to return lobby to waiting state (will auto-ready AI)
+  ws.value.send(JSON.stringify({
+    type: 'returnToLobby',
+    payload: {}
+  }));
+};
+
+const handleQuitToLobby = () => {
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  
+  // Send leave lobby message
+  ws.value.send(JSON.stringify({
+    type: 'leaveLobby',
+    payload: {}
+  }));
+  
+  // Reset all state
+  gameState.value = 'waiting';
+  winner.value = null;
+  crashedPlayers.value = [];
+  gamePlayers.value = [];
+  isReady.value = false;
+  countdown.value = null;
+  lobbyId.value = null;
+  lobbyState.value = null;
+  
+  // Show lobby browser
+  showLobby.value = false;
+  showBrowser.value = true;
+};
+
+const setupKeyboardListeners = () => {
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (gameState.value !== 'playing') return;
+
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      e.preventDefault();
+    }
+
+    let newDirection = '';
+    switch (e.key) {
+      case 'ArrowUp': newDirection = 'up'; break;
+      case 'ArrowDown': newDirection = 'down'; break;
+      case 'ArrowLeft': newDirection = 'left'; break;
+      case 'ArrowRight': newDirection = 'right'; break;
+    }
+
+    if (newDirection) {
+      const isOpposite = (
+        (currentDirection.value === 'up' && newDirection === 'down') ||
+        (currentDirection.value === 'down' && newDirection === 'up') ||
+        (currentDirection.value === 'left' && newDirection === 'right') ||
+        (currentDirection.value === 'right' && newDirection === 'left')
+      );
+
+      if (isOpposite) {
+        isBraking.value = true;
+        ws.value?.send(JSON.stringify({
+          type: 'brake',
+          payload: { braking: true }
+        }));
+      } else {
+        currentDirection.value = newDirection;
+        ws.value?.send(JSON.stringify({
+          type: 'move',
+          payload: { direction: newDirection }
+        }));
+      }
+    }
+  };
+
+  const handleKeyUp = (e: KeyboardEvent) => {
+    if (gameState.value !== 'playing') return;
+
+    let direction = '';
+    switch (e.key) {
+      case 'ArrowUp': direction = 'up'; break;
+      case 'ArrowDown': direction = 'down'; break;
+      case 'ArrowLeft': direction = 'left'; break;
+      case 'ArrowRight': direction = 'right'; break;
+    }
+
+    if (direction && isBraking.value) {
+      const isOpposite = (
+        (currentDirection.value === 'up' && direction === 'down') ||
+        (currentDirection.value === 'down' && direction === 'up') ||
+        (currentDirection.value === 'left' && direction === 'right') ||
+        (currentDirection.value === 'right' && direction === 'left')
+      );
+
+      if (isOpposite) {
+        isBraking.value = false;
+        ws.value?.send(JSON.stringify({
+          type: 'brake',
+          payload: { braking: false }
+        }));
+      }
+    }
+  };
+
+  window.addEventListener('keydown', handleKeyDown);
+  window.addEventListener('keyup', handleKeyUp);
+  return () => {
+    window.removeEventListener('keydown', handleKeyDown);
+    window.removeEventListener('keyup', handleKeyUp);
+  };
+};
+
+const getTrailColor = (color: string | undefined) => {
+  if (!color) return '#ffffff66';
+  
+  if (color.startsWith('hsl')) {
+    const matches = color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+    if (matches && matches.length >= 4) {
+      const h = parseInt(matches[1] || '0');
+      const s = parseInt(matches[2] || '0');
+      const l = parseInt(matches[3] || '0');
+      if (!isNaN(h) && !isNaN(s) && !isNaN(l)) {
+        return `hsla(${h}, ${s}%, ${Math.min(l + 20, 90)}%, 0.4)`;
+      }
+    }
+  }
+  return `${color}66`;
+};
+
+const drawGame = () => {
+  const canvasEl = canvasRef.value;
+  
+  if (!canvasEl) {
+    console.error('[drawGame] No canvas element');
+    return;
+  }
+  
+  // ALWAYS get a fresh context - hydration issue workaround
+  ctx = canvasEl.getContext('2d', { 
+    alpha: false,
+    willReadFrequently: false 
+  });
+  if (!ctx) {
+    console.error('[drawGame] Failed to get canvas context');
+    return;
+  }
+  ctx.imageSmoothingEnabled = false;
+
+  // Only update canvas dimensions if they actually changed
+  const size = currentGridSize.value * cellSize;
+  if (canvasEl.width !== size || canvasEl.height !== size) {
+    canvasEl.width = size;
+    canvasEl.height = size;
+    // Re-apply context settings after resize
+    if (ctx) {
+      ctx.imageSmoothingEnabled = false;
+    }
+  }
+  
+  ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+
+  // Draw grid
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= currentGridSize.value; i++) {
+    const pos = i * cellSize;
+    ctx.beginPath();
+    ctx.moveTo(pos, 0);
+    ctx.lineTo(pos, canvasEl.height);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, pos);
+    ctx.lineTo(canvasEl.width, pos);
+    ctx.stroke();
+  }
+
+  // Draw trails and players
+  gamePlayers.value.forEach(player => {
+    const trailColor = getTrailColor(player.color);
+    ctx.fillStyle = trailColor;
+    player.trail.forEach(pos => {
+      const coords = pos.split(',').map(Number);
+      if (coords.length === 2 && !coords.some(isNaN) && coords[0] !== undefined && coords[1] !== undefined) {
+        ctx.fillRect(coords[0] * cellSize, coords[1] * cellSize, cellSize, cellSize);
+      }
+    });
+
+    if (player.speedBoostUntil && Date.now() < player.speedBoostUntil) {
+      ctx.shadowColor = '#ffff00';
+      ctx.shadowBlur = 20;
+    }
+
+    if (player.isBraking && player.brakeStartTime) {
+      const brakeDuration = (Date.now() - player.brakeStartTime) / 1000;
+      const brakeIntensity = Math.min(1, brakeDuration * 0.2);
+      ctx.shadowColor = '#ff0000';
+      ctx.shadowBlur = 15 + (10 * brakeIntensity);
+    }
+
+    if (typeof player.x === 'number' && typeof player.y === 'number' && player.color) {
+      ctx.fillStyle = player.color;
+      ctx.fillRect(player.x * cellSize, player.y * cellSize, cellSize, cellSize);
+
+      const center = {
+        x: player.x * cellSize + cellSize / 2,
+        y: player.y * cellSize + cellSize / 2
+      };
+      
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      switch (player.direction) {
+        case 'up':
+          ctx.moveTo(center.x, center.y - cellSize / 3);
+          ctx.lineTo(center.x - cellSize / 4, center.y);
+          ctx.lineTo(center.x + cellSize / 4, center.y);
+          break;
+        case 'down':
+          ctx.moveTo(center.x, center.y + cellSize / 3);
+          ctx.lineTo(center.x - cellSize / 4, center.y);
+          ctx.lineTo(center.x + cellSize / 4, center.y);
+          break;
+        case 'left':
+          ctx.moveTo(center.x - cellSize / 3, center.y);
+          ctx.lineTo(center.x, center.y - cellSize / 4);
+          ctx.lineTo(center.x, center.y + cellSize / 4);
+          break;
+        case 'right':
+          ctx.moveTo(center.x + cellSize / 3, center.y);
+          ctx.lineTo(center.x, center.y - cellSize / 4);
+          ctx.lineTo(center.x, center.y + cellSize / 4);
+          break;
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+
+      if (player.name) {
+        ctx.fillStyle = '#fff';
+        ctx.font = '12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(
+          player.name + (player.id === playerId.value ? ' (You)' : ''),
+          player.x * cellSize + cellSize / 2,
+          player.y * cellSize - 5
+        );
+      }
+    }
+  });
+
+  // Draw power-ups
+  powerUps.value.forEach(powerUp => {
+    if (typeof powerUp.x === 'number' && typeof powerUp.y === 'number') {
+      const x = powerUp.x * cellSize;
+      const y = powerUp.y * cellSize;
+
+      ctx.shadowColor = '#ffff00';
+      ctx.shadowBlur = 15;
+      ctx.fillStyle = '#ffff00';
+      ctx.beginPath();
+      ctx.arc(x + cellSize / 2, y + cellSize / 2, cellSize / 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      ctx.moveTo(x + cellSize/2, y + cellSize/4);
+      ctx.lineTo(x + cellSize/3, y + cellSize/2);
+      ctx.lineTo(x + cellSize/2, y + cellSize/2);
+      ctx.lineTo(x + cellSize/3, y + 3*cellSize/4);
+      ctx.lineTo(x + 2*cellSize/3, y + cellSize/2);
+      ctx.lineTo(x + cellSize/2, y + cellSize/2);
+      ctx.lineTo(x + 2*cellSize/3, y + cellSize/4);
+      ctx.closePath();
+      ctx.fill();
+    }
+  });
+
+  // Draw obstacles
+  ctx.fillStyle = '#444';
+  obstacles.value.forEach(pos => {
+    const coords = pos.split(',').map(Number);
+    if (coords.length === 2 && !coords.some(isNaN) && coords[0] !== undefined && coords[1] !== undefined) {
+      ctx.fillRect(coords[0] * cellSize, coords[1] * cellSize, cellSize, cellSize);
+    }
+  });
+  
+  // Request next frame for continuous rendering
+  if (gameState.value === 'playing') {
+    requestAnimationFrame(drawGame);
+  }
+};
+
+const toggleYoutube = () => {
+  if (!youtubePlayer.value) return;
+  
+  if (isYoutubePlaying.value) {
+    youtubePlayer.value.pauseVideo();
+  } else {
+    youtubePlayer.value.playVideo();
+  }
+};
+
+onMounted(() => {
+  const cleanup = setupKeyboardListeners();
+
+  nextTick(() => {
+    if (canvasRef.value) {
+      // Always set a minimum size
+      const size = currentGridSize.value > 0 ? currentGridSize.value * cellSize : 800;
+      canvasRef.value.width = size;
+      canvasRef.value.height = size;
+      ctx = canvasRef.value.getContext('2d');
+      if (ctx) {
+        ctx.imageSmoothingEnabled = false;
+      }
+    }
+  });
+
+  // Initialize YouTube
+  if (import.meta.client) {
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    if (firstScriptTag?.parentNode) {
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    }
+
+    // Initialize player when API is ready
+    (window as { onYouTubeIframeAPIReady?: () => void; YT?: { Player: new (id: string, config: unknown) => YouTubePlayer } }).onYouTubeIframeAPIReady = () => {
+    const YT = (window as { YT?: { Player: new (id: string, config: unknown) => YouTubePlayer } }).YT;
+    if (!YT) return;
+    youtubePlayer.value = new YT.Player('youtubePlayer', {
+      videoId: 'TAutddyBrOg',
+      playerVars: {
+        autoplay: 0,
+        controls: 0,
+        disablekb: 1,
+        fs: 0,
+        modestbranding: 1,
+        playsinline: 1,
+        rel: 0,
+        showinfo: 0,
+        loop: 1,
+        playlist: 'TAutddyBrOg',
+        start: 20
+      },
+      events: {
+        onReady: (event: YouTubeEvent) => {
+          event.target.setVolume(30);
+        },
+        onStateChange: (event: YouTubeEvent) => {
+          isYoutubePlaying.value = event.data === 1;
+        }
+      }
+    });
+    };
+  }
+
+  onUnmounted(() => {
+    cleanup();
+    ws.value?.close();
+    if (youtubePlayer.value) {
+      youtubePlayer.value.pauseVideo();
+    }
+  });
+});
+</script>
+
+<template>
+  <div class="game-container">
+    <!-- Music controls -->
+    <div v-if="!showNameDialog && !showBrowser" class="music-controls">
+      <button @click="toggleYoutube" class="music-btn">
+        {{ isYoutubePlaying ? '🔇 Mute' : '🔊 Play Music' }}
+      </button>
+    </div>
+
+    <!-- Controls info -->
+    <div v-if="!showNameDialog && !showBrowser && gameState === 'playing'" class="controls">
+      <p>Game Controls</p>
+      <div class="key-controls">
+        <div class="key">↑</div>
+        <div class="key-row">
+          <div class="key">←</div>
+          <div class="key">↓</div>
+          <div class="key">→</div>
+        </div>
+      </div>
+      <p class="instruction">Use Arrow Keys to move</p>
+      <p class="instruction">Press opposite direction to brake</p>
+      <p class="instruction">Collect ⚡ for speed boost</p>
+    </div>
+
+    <!-- Name/Color Dialog -->
+    <div v-if="showNameDialog" class="name-dialog">
+      <div class="name-dialog-content">
+        <h2>{{ isConfigured ? 'Update Settings' : 'Welcome to Light Cycles!' }}</h2>
+        <div class="input-group">
+          <label for="playerName">Your Name:</label>
+          <input 
+            id="playerName"
+            v-model="tempName" 
+            @keyup.enter="savePlayerSettings"
+            placeholder="Enter your name"
+            maxlength="20"
+            class="name-input"
+          >
+        </div>
+        
+        <div class="input-group">
+          <label>Your Avatar:</label>
+          <div class="avatar-picker">
+            <div 
+              v-for="avatar in AVATAR_OPTIONS" 
+              :key="avatar.id"
+              class="avatar-option"
+              :class="{ 'selected': tempAvatar === avatar.id }"
+              @click="tempAvatar = avatar.id"
+              :title="avatar.label"
+            >
+              <div class="avatar-icon" v-html="avatar.svg"></div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="input-group">
+          <label>Your Color:</label>
+          <div class="color-picker">
+            <input 
+              type="color" 
+              v-model="tempColorHex"
+              class="hidden-color-input"
+              @input="tempColor = hexToHSL(tempColorHex) || tempColor"
+            />
+            <div 
+              class="color-square" 
+              :style="{ backgroundColor: tempColor }"
+              @click="handleColorSquareClick"
+            ></div>
+            <button @click="() => {
+              const color = generateRandomColor();
+              tempColor = color.hsl;
+              tempColorHex = color.hex;
+            }" class="random-color-btn">
+              🎲 Random Color
+            </button>
+          </div>
+        </div>
+        <button @click="savePlayerSettings" class="start-btn">
+          {{ isConfigured ? 'Save & Continue' : 'Continue' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Reconnection overlay -->
+    <div v-if="isReconnecting" class="reconnection-overlay">
+      <div class="reconnection-box">
+        <div class="reconnection-spinner"></div>
+        <p class="reconnection-text">Reconnecting to server...</p>
+        <p class="reconnection-attempt">Attempt {{ reconnectAttempts }} of 5</p>
+      </div>
+    </div>
+
+    <!-- Lobby Browser -->
+    <div v-if="showBrowser" class="lobby-browser-overlay">
+      <LobbyBrowser
+        ref="lobbyBrowser"
+        :player-name="playerSettings.name"
+        @join-lobby="handleJoinLobby"
+        @spectate-game="handleSpectateGame"
+        @create-lobby="showCreateDialog = true"
+        @change-settings="changePlayerSettings"
+      />
+    </div>
+
+    <!-- Create Lobby Dialog -->
+    <CreateLobbyDialog
+      v-if="showCreateDialog"
+      @create="handleCreateLobby"
+      @cancel="showCreateDialog = false"
+    />
+
+    <!-- Lobby Panel (in lobby, waiting) -->
+    <div v-if="showLobby && lobbyState && gameState !== 'playing'" class="lobby-overlay">
+      <div class="lobby-panel-container">
+        <div v-if="isSpectator" class="spectator-badge">
+          👁️ Spectating
+        </div>
+        <LobbyPanel
+          :lobby-state="lobbyState"
+          :current-player-id="playerId"
+          :is-ready="isReady"
+          @toggle-ready="toggleReady"
+          @update-settings="updateLobbySettings"
+          @leave-lobby="handleQuitToLobby"
+        />
+      </div>
+    </div>
+
+    <!-- Countdown overlay -->
+    <div v-if="gameState === 'starting' && countdown !== null" class="countdown-overlay">
+      <div class="countdown">
+        <p class="starting">Game starting in</p>
+        <div class="countdown-number">{{ countdown }}</div>
+      </div>
+    </div>
+
+    <!-- Game Over overlay -->
+    <div v-if="gameState === 'finished'" class="game-over-overlay">
+      <div class="game-over-box">
+        <h2 class="game-over-title">End of line, man!</h2>
+        <p class="game-over-message">
+          <span v-if="winner" :style="{ color: winner?.color || '#0ff' }">
+            {{ winner?.id === playerId ? 'You won! 🎉' : `${gamePlayers.find(p => p.id === winner?.id)?.name || 'Unknown Player'} won!` }}
+          </span>
+          <span v-else>Draw - Everyone crashed!</span>
+        </p>
+        <div class="game-over-actions">
+          <button @click="handlePlayAgain" class="game-over-btn replay-btn">
+            🔄 Play Again
+          </button>
+          <button @click="handleQuitToLobby" class="game-over-btn quit-btn">
+            🚪 Back to Lobby Browser
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Debug toggle -->
+    <button 
+      v-if="!showNameDialog && !showBrowser"
+      @click="showDebug = !showDebug" 
+      class="debug-toggle"
+      :class="{ 'is-active': showDebug }"
+      title="Toggle Debug Info"
+    >
+      ⚙️
+    </button>
+
+    <!-- Debug modal -->
+    <Transition name="slide">
+      <div v-if="showDebug" class="debug-modal">
+        <div class="debug-header">
+          <h3>Debug Info</h3>
+          <button @click="showDebug = false" class="close-btn">×</button>
+        </div>
+        <div class="debug-content">
+          <pre>{{ JSON.stringify({
+            playerId,
+            lobbyId,
+            lobbyState: lobbyState?.state,
+            gameState,
+            countdown,
+            isReady,
+            showLobby,
+            showBrowser,
+            showNameDialog,
+            canvasVisible: !showNameDialog && !showBrowser
+          }, null, 2) }}</pre>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Hidden YouTube player -->
+    <div class="hidden-youtube">
+      <div id="youtubePlayer"></div>
+    </div>
+
+    <!-- Game canvas (only show when in a lobby or game) -->
+    <div v-if="!showNameDialog && !showBrowser && lobbyId" class="game-board">
+      <canvas ref="canvasRef" style="border: 2px solid #0ff; background-color: #000;"></canvas>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.game-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #0f0;
+  background-color: #111;
+}
+
+.lobby-browser-overlay,
+.lobby-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1500;
+  overflow-y: auto;
+}
+
+.lobby-panel-container {
+  position: relative;
+}
+
+.spectator-badge {
+  position: absolute;
+  top: -50px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(150, 150, 150, 0.9);
+  color: #fff;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 2px solid rgba(200, 200, 200, 0.8);
+  box-shadow: 0 0 15px rgba(150, 150, 150, 0.5);
+  z-index: 10;
+}
+
+.reconnection-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2500;
+}
+
+.reconnection-box {
+  background: rgba(0, 20, 20, 0.95);
+  border: 3px solid #0ff;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+}
+
+.reconnection-spinner {
+  width: 60px;
+  height: 60px;
+  border: 5px solid rgba(0, 255, 255, 0.2);
+  border-top-color: #0ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.reconnection-text {
+  color: #0ff;
+  font-size: 20px;
+  margin: 10px 0;
+  font-weight: 600;
+}
+
+.reconnection-attempt {
+  color: #888;
+  font-size: 14px;
+  margin: 5px 0;
+}
+
+.countdown-overlay,
+.game-over-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.game-over-overlay {
+  background: rgba(0, 0, 0, 0.85);
+  pointer-events: all;
+}
+
+.game-over-box {
+  background: rgba(0, 20, 20, 0.95);
+  border: 3px solid #0ff;
+  border-radius: 12px;
+  padding: 40px;
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+  text-align: center;
+}
+
+.game-over-title {
+  color: #0ff;
+  font-size: 36px;
+  margin: 0 0 20px 0;
+  text-shadow: 0 0 15px rgba(0, 255, 255, 0.8);
+}
+
+.game-over-message {
+  font-size: 24px;
+  margin: 0 0 30px 0;
+  font-weight: 600;
+}
+
+.game-over-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.game-over-btn {
+  padding: 14px 28px;
+  font-size: 16px;
+  font-weight: 600;
+  border: 2px solid;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.replay-btn {
+  background: #0ff;
+  color: #001414;
+  border-color: #0ff;
+}
+
+.replay-btn:hover {
+  background: #00cccc;
+  transform: scale(1.05);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+}
+
+.quit-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: #666;
+}
+
+.quit-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: #999;
+  transform: scale(1.05);
+}
+
+.controls {
+  margin-top: 20px;
+  text-align: center;
+  color: #0ff;
+  border: 2px solid #0ff;
+  padding: 15px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+  position: fixed;
+  top: 70px;
+  right: 60px;
+  z-index: 100;
+  min-width: 200px;
+}
+
+.controls p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.controls .instruction {
+  color: #fff;
+  opacity: 0.8;
+  font-size: 12px;
+  margin: 4px 0;
+}
+
+.key-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  margin: 10px 0;
+}
+
+.key-row {
+  display: flex;
+  gap: 5px;
+}
+
+.key {
+  width: 40px;
+  height: 40px;
+  background: rgba(0, 255, 255, 0.1);
+  border: 1px solid #0ff;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: #0ff;
+}
+
+.countdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.9);
+  padding: 30px 50px;
+  border-radius: 12px;
+  border: 3px solid #0ff;
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+}
+
+.starting {
+  color: #ff0;
+  font-size: 24px;
+  margin: 0;
+}
+
+.countdown-number {
+  font-size: 96px;
+  font-weight: bold;
+  color: #0ff;
+  text-shadow: 0 0 30px #0ff;
+  animation: countdownPulse 1s ease-in-out infinite;
+}
+
+@keyframes countdownPulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.music-controls {
+  position: fixed;
+  top: 20px;
+  right: 60px;
+  z-index: 100;
+}
+
+.music-btn {
+  background: #0066cc;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.music-btn:hover {
+  background: #0052a3;
+}
+
+.debug-toggle {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: rgba(0, 255, 255, 0.1);
+  border: 2px solid #0ff;
+  color: #0ff;
+  cursor: pointer;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  font-size: 20px;
+}
+
+.debug-toggle:hover {
+  background: rgba(0, 255, 255, 0.2);
+}
+
+.debug-toggle.is-active {
+  background: rgba(0, 255, 255, 0.3);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+}
+
+.debug-modal {
+  position: fixed;
+  top: 60px;
+  right: 10px;
+  width: 300px;
+  background: rgba(0, 0, 0, 0.9);
+  border: 2px solid #0ff;
+  border-radius: 8px;
+  padding: 0;
+  z-index: 1000;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+}
+
+.debug-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: rgba(0, 255, 255, 0.1);
+  border-bottom: 1px solid #0ff;
+}
+
+.debug-header h3 {
+  margin: 0;
+  color: #0ff;
+  font-size: 14px;
+  font-family: monospace;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: #0ff;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 5px;
+  line-height: 1;
+}
+
+.close-btn:hover {
+  color: #fff;
+}
+
+.debug-content {
+  padding: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.debug-content pre {
+  margin: 0;
+  font-family: monospace;
+  font-size: 12px;
+  color: #0ff;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.slide-enter-active,
+.slide-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-enter-from,
+.slide-leave-to {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+.hidden-youtube {
+  position: fixed;
+  top: -9999px;
+  left: -9999px;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.game-board {
+  position: relative;
+  margin: 20px auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+  border: 2px solid #0ff;
+  background-color: #000;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.name-dialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.name-dialog-content {
+  background: rgba(0, 20, 20, 0.95);
+  padding: 40px;
+  border-radius: 12px;
+  border: 2px solid #0ff;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3),
+              inset 0 0 30px rgba(0, 255, 255, 0.1);
+  min-width: 400px;
+}
+
+.name-dialog h2 {
+  color: #0ff;
+  margin: 0 0 30px;
+  font-size: 28px;
+  text-align: center;
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+}
+
+.input-group {
+  margin: 25px 0;
+  text-align: left;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 12px;
+  color: #0ff;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.name-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #0ff;
+  background: rgba(0, 255, 255, 0.1);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 18px;
+  transition: all 0.3s ease;
+}
+
+.name-input:focus {
+  outline: none;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+  background: rgba(0, 255, 255, 0.15);
+}
+
+.avatar-picker {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.avatar-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  border: 2px solid rgba(0, 255, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(0, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.avatar-option:hover {
+  border-color: rgba(0, 255, 255, 0.6);
+  background: rgba(0, 255, 255, 0.1);
+  transform: scale(1.05);
+}
+
+.avatar-option.selected {
+  border-color: #0ff;
+  background: rgba(0, 255, 255, 0.2);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+}
+
+.avatar-icon {
+  width: 32px;
+  height: 32px;
+  color: #0ff;
+}
+
+.avatar-icon :deep(svg) {
+  width: 100%;
+  height: 100%;
+  stroke: currentColor;
+}
+
+.avatar-option:hover .avatar-icon {
+  color: #0ff;
+}
+
+.avatar-option.selected .avatar-icon {
+  color: #0ff;
+  filter: drop-shadow(0 0 4px #0ff);
+}
+
+.color-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 15px;
+  position: relative;
+}
+
+.color-square {
+  width: 60px;
+  height: 60px;
+  border: 2px solid #0ff;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.color-square:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+}
+
+.random-color-btn {
+  width: 100%;
+  padding: 12px;
+  background: rgba(0, 255, 255, 0.1);
+  border: 2px solid #0ff;
+  color: #0ff;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.random-color-btn:hover {
+  background: rgba(0, 255, 255, 0.2);
+  transform: scale(1.02);
+}
+
+.start-btn {
+  width: 100%;
+  margin-top: 20px;
+  padding: 14px;
+  background: #0ff;
+  border: none;
+  border-radius: 8px;
+  color: #001414;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.start-btn:hover {
+  transform: scale(1.02);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+}
+
+.hidden-color-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+</style>
