@@ -229,23 +229,22 @@ const initializeGameState = () => {
 const simulateTick = (tick: number) => {
   if (!props.replayData) return;
 
-  // Apply all actions for this tick
-  const actionsForTick = props.replayData.actions.filter(a => a.tick === tick);
-  actionsForTick.forEach(action => {
-    const player = gameState.value.players.get(action.playerId);
-    if (!player) return;
-
-    if (action.action === 'move' && action.payload.direction) {
-      player.direction = action.payload.direction;
-    } else if (action.action === 'brake') {
-      player.isBraking = action.payload.braking;
-    }
-  });
-
   // Apply all events for this tick
   const eventsForTick = props.replayData.events.filter(e => e.tick === tick);
   eventsForTick.forEach(event => {
-    if (event.type === 'playerCrashed') {
+    if (event.type === 'positionSnapshot') {
+      // Use position snapshot from server (most accurate)
+      const positions = event.payload.positions;
+      Object.entries(positions).forEach(([playerId, data]: [string, any]) => {
+        const player = gameState.value.players.get(playerId);
+        if (player) {
+          player.x = data.x;
+          player.y = data.y;
+          player.direction = data.direction;
+          player.trail = data.trail;
+        }
+      });
+    } else if (event.type === 'playerCrashed') {
       const player = gameState.value.players.get(event.payload.playerId);
       if (player) {
         player.direction = 'crashed';
@@ -257,32 +256,6 @@ const simulateTick = (tick: number) => {
       if (index >= 0 && index < gameState.value.powerUps.length) {
         gameState.value.powerUps.splice(index, 1);
       }
-    }
-  });
-
-  // Move all non-crashed players
-  gameState.value.players.forEach(player => {
-    if (player.direction === 'crashed') return;
-
-    // Calculate movement steps based on speed/braking
-    const moveSteps = player.isBraking ? (tick % 5 === 0 ? 1 : 0) : player.speed;
-
-    for (let step = 0; step < moveSteps; step++) {
-      const startPos = `${player.x},${player.y}`;
-      if (!player.trail.includes(startPos)) {
-        player.trail.push(startPos);
-      }
-
-      // Update position
-      switch (player.direction) {
-        case 'up': player.y--; break;
-        case 'down': player.y++; break;
-        case 'left': player.x--; break;
-        case 'right': player.x++; break;
-      }
-
-      const currentPos = `${player.x},${player.y}`;
-      player.trail.push(currentPos);
     }
   });
 };

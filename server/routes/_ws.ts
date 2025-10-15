@@ -661,6 +661,23 @@ const startGameLoop = (lobbyId: string) => {
 
     // Broadcast updated game state
     broadcastGameState(lobbyId);
+    
+    // Record player positions for replay (snapshot every tick)
+    if (recorder) {
+      const positionSnapshot: Record<string, { x: number; y: number; direction: string; trail: string[] }> = {};
+      context.players.forEach(player => {
+        positionSnapshot[player.id] = {
+          x: player.x,
+          y: player.y,
+          direction: player.direction,
+          trail: [...player.trail] // Copy trail array
+        };
+      });
+      recorder.recordEvent({
+        type: 'positionSnapshot',
+        payload: { positions: positionSnapshot },
+      });
+    }
 
     // Get FRESH context after all crash events have been processed
     const freshSnapshot = lobby.gameActor?.getSnapshot();
