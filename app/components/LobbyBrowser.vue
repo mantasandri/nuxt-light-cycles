@@ -16,6 +16,7 @@ const emit = defineEmits<{
   spectateGame: [lobbyId: string];
   createLobby: [];
   changeSettings: [];
+  openReplays: [];
 }>();
 
 defineProps<{
@@ -115,6 +116,10 @@ defineExpose({
 
       <button @click="emit('createLobby')" class="create-btn">
         ➕ Create Lobby
+      </button>
+
+      <button @click="emit('openReplays')" class="replays-btn">
+        🎬 My Replays
       </button>
     </div>
 
@@ -286,7 +291,8 @@ defineExpose({
   cursor: pointer;
 }
 
-.create-btn {
+.create-btn,
+.replays-btn {
   background: #0ff;
   border: none;
   color: #001414;
@@ -295,13 +301,26 @@ defineExpose({
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
-  margin-left: auto;
   transition: all 0.2s;
 }
 
-.create-btn:hover {
+.create-btn {
+  margin-left: auto;
+}
+
+.replays-btn {
+  background: rgba(255, 100, 255, 0.8);
+  color: #fff;
+}
+
+.create-btn:hover,
+.replays-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 255, 255, 0.4);
+}
+
+.replays-btn:hover {
+  box-shadow: 0 4px 12px rgba(255, 100, 255, 0.4);
 }
 
 .lobbies-list {
@@ -454,5 +473,6 @@ defineExpose({
   transform: scale(1.05);
 }
 </style>
+
 
 

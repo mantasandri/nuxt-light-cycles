@@ -1,11 +1,13 @@
 // app/composables/usePlayerSettings.ts
 import { ref, watch } from 'vue';
+import { nanoid } from 'nanoid';
 
 export interface PlayerSettings {
   name: string;
   color: string;
   colorHex: string;
   avatar: string;
+  userId?: string; // Persistent user ID
 }
 
 // Tron-themed avatar options with SVG icons
@@ -73,6 +75,35 @@ export const AVATAR_OPTIONS = [
 ];
 
 const STORAGE_KEY = 'lightcycles_player_settings';
+const USER_ID_KEY = 'lightcycles_userId';
+
+/**
+ * Get or create a persistent user ID
+ * This ID stays the same across sessions and page refreshes
+ */
+const getPersistentUserId = (): string => {
+  if (typeof window === 'undefined') return '';
+  
+  try {
+    // Check if user ID already exists
+    let userId = localStorage.getItem(USER_ID_KEY);
+    
+    if (!userId) {
+      // Generate new user ID (12 characters, URL-safe)
+      userId = `user-${nanoid(12)}`;
+      localStorage.setItem(USER_ID_KEY, userId);
+      console.log('[UserID] Generated new persistent user ID:', userId);
+    } else {
+      console.log('[UserID] Loaded existing user ID:', userId);
+    }
+    
+    return userId;
+  } catch (error) {
+    console.error('Failed to get persistent user ID:', error);
+    // Fallback to session-based ID if localStorage fails
+    return `user-${nanoid(12)}`;
+  }
+};
 
 export function usePlayerSettings() {
   const settings = ref<PlayerSettings>({
@@ -80,6 +111,7 @@ export function usePlayerSettings() {
     color: 'hsl(180, 90%, 60%)',
     colorHex: '#00ffff',
     avatar: 'recognizer', // Default avatar
+    userId: '', // Will be set on load
   });
 
   const isConfigured = ref(false);
@@ -89,11 +121,17 @@ export function usePlayerSettings() {
     if (typeof window === 'undefined') return;
     
     try {
+      // Always get/create persistent user ID
+      const userId = getPersistentUserId();
+      
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        settings.value = parsed;
+        settings.value = { ...parsed, userId }; // Ensure userId is always set
         isConfigured.value = true;
+      } else {
+        // First time user - set userId but settings not configured yet
+        settings.value.userId = userId;
       }
     } catch (error) {
       console.error('Failed to load player settings:', error);
@@ -105,7 +143,9 @@ export function usePlayerSettings() {
     if (typeof window === 'undefined') return;
     
     try {
-      settings.value = { ...newSettings };
+      // Ensure userId is preserved
+      const userId = settings.value.userId || getPersistentUserId();
+      settings.value = { ...newSettings, userId };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings.value));
       isConfigured.value = true;
     } catch (error) {
@@ -119,16 +159,24 @@ export function usePlayerSettings() {
     
     try {
       localStorage.removeItem(STORAGE_KEY);
+      // Keep the userId but clear other settings
+      const userId = settings.value.userId || getPersistentUserId();
       settings.value = {
         name: '',
         color: 'hsl(180, 90%, 60%)',
         colorHex: '#00ffff',
         avatar: 'recognizer',
+        userId,
       };
       isConfigured.value = false;
     } catch (error) {
       console.error('Failed to clear player settings:', error);
     }
+  };
+
+  // Get the current persistent user ID
+  const getUserId = (): string => {
+    return settings.value.userId || getPersistentUserId();
   };
 
   return {
@@ -137,6 +185,10 @@ export function usePlayerSettings() {
     loadSettings,
     saveSettings,
     clearSettings,
+    getUserId,
   };
 }
+
+// Export the function to get persistent user ID for use in other parts of the app
+export { getPersistentUserId };
 

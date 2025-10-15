@@ -20,6 +20,7 @@ export interface GamePlayer {
   brakeStartTime: number | null;
   lastDirection?: string;
   gameId: string;
+  avatar?: string;
 }
 
 export interface Spectator {
@@ -49,6 +50,7 @@ export interface LobbySettings {
   gridSize: number;
   maxPlayers: number;
   allowSpectators: boolean;
+  lobbyName?: string;
 }
 
 export const DEFAULT_GAME_SETTINGS: GameSettings = {

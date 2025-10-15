@@ -4,6 +4,9 @@ import { usePlayerSettings, AVATAR_OPTIONS } from '~/composables/usePlayerSettin
 import LobbyPanel from '~/components/LobbyPanel.vue';
 import LobbyBrowser from '~/components/LobbyBrowser.vue';
 import CreateLobbyDialog from '~/components/CreateLobbyDialog.vue';
+import ReplayBrowser from '~/components/ReplayBrowser.vue';
+import ReplayPlayer from '~/components/ReplayPlayer.vue';
+import VirtualDPad from '~/components/VirtualDPad.vue';
 
 interface PowerUp {
   x: number;
@@ -76,6 +79,10 @@ const showBrowser = ref(false);
 const showLobby = ref(false);
 const showCreateDialog = ref(false);
 const showDebug = ref(false);
+const showReplayBrowser = ref(false);
+const showReplayPlayer = ref(false);
+const replayAvailable = ref(false);
+const savingReplay = ref(false);
 
 // WebSocket
 const ws = ref<WebSocket | null>(null);
@@ -109,6 +116,58 @@ const currentDirection = ref<string>('');
 
 // Lobby browser
 const lobbyBrowser = ref<InstanceType<typeof LobbyBrowser> | null>(null);
+
+// Replay system
+interface ReplayData {
+  metadata: {
+    replayId: string;
+    lobbyName: string;
+    createdAt: number;
+    duration: number;
+    totalTicks: number;
+    winner: {
+      playerId: string;
+      name: string;
+      color: string;
+    } | null;
+    playerCount: number;
+    gridSize: number;
+  };
+  initialState: {
+    gridSize: number;
+    players: Array<{
+      id: string;
+      name: string;
+      color: string;
+      avatar: string;
+      x: number;
+      y: number;
+      direction: 'up' | 'down' | 'left' | 'right' | 'crashed';
+      isAI: boolean;
+    }>;
+    obstacles: Array<{ x: number; y: number }>;
+    settings: {
+      maxPlayers: number;
+      tickRate: number;
+      maxPowerUps: number;
+    };
+  };
+  actions: Array<{
+    tick: number;
+    playerId: string;
+    action: 'move' | 'brake';
+    payload: unknown;
+    timestamp: number;
+  }>;
+  events: Array<{
+    tick: number;
+    type: string;
+    payload: unknown;
+    timestamp: number;
+  }>;
+}
+
+const currentReplayData = ref<ReplayData | null>(null);
 
 // Temporary name/color for dialog
 const tempName = ref('');
@@ -179,25 +238,6 @@ const generateRandomColor = () => {
   return { hsl, hex };
 };
 
-// Initialize or show settings dialog
-onMounted(() => {
-  loadSettings();
-  
-  if (!isConfigured.value) {
-    // Generate random color for first-time users
-    const color = generateRandomColor();
-    tempColor.value = color.hsl;
-    tempColorHex.value = color.hex;
-    showNameDialog.value = true;
-  } else {
-    // Use saved settings
-    tempName.value = playerSettings.value.name || '';
-    tempColor.value = playerSettings.value.color || 'hsl(180, 90%, 60%)';
-    tempColorHex.value = playerSettings.value.colorHex || '#00ffff';
-    connectWebSocket();
-  }
-});
-
 const savePlayerSettings = () => {
   if (!tempName.value.trim()) return;
   
@@ -262,6 +302,16 @@ const connectWebSocket = () => {
           reconnectToken.value = data.payload.reconnectToken;
           isReconnecting.value = false;
           reconnectAttempts.value = 0;
+          
+          // Send persistent userId to server immediately after connection
+          const userId = playerSettings.value.userId;
+          if (userId && socket.readyState === WebSocket.OPEN) {
+            console.log('[UserID] Sending persistent userId to server:', userId);
+            socket.send(JSON.stringify({
+              type: 'setUserId',
+              payload: { userId },
+            }));
+          }
           
           // Save reconnection token to localStorage
           if (reconnectToken.value) {
@@ -337,6 +387,10 @@ const connectWebSocket = () => {
           } else if (data.payload.state === 'inGame') {
             gameState.value = 'playing';
             showLobby.value = false;
+            
+            // Close any replay overlays when game starts
+            showReplayBrowser.value = false;
+            showReplayPlayer.value = false;
             
             // Make sure canvas is properly sized when game starts
             if (canvasRef.value && currentGridSize.value > 0) {
@@ -417,8 +471,27 @@ const connectWebSocket = () => {
           isReady.value = false;
           countdown.value = null;
           showLobby.value = false; // Hide lobby panel so game over screen shows
-          console.log('[Client] Game state set to finished, showLobby:', showLobby.value, 'winner:', winner.value);
+          replayAvailable.value = data.payload.replayAvailable || false;
+          console.log('[Client] Game state set to finished');
+          console.log('[Client] Replay available:', replayAvailable.value);
+          console.log('[Client] Is spectator:', isSpectator.value);
+          console.log('[Client] Winner:', winner.value);
           drawGame();
+          break;
+
+        case 'replaySaved':
+          console.log('[Client] Replay saved:', data.payload);
+          savingReplay.value = false;
+          replayAvailable.value = false;
+          // Show success message
+          alert(data.payload.message || 'Replay saved successfully!');
+          break;
+
+        case 'replayData':
+          console.log('[Client] Replay data received');
+          currentReplayData.value = data.payload.replay;
+          showReplayBrowser.value = false;
+          showReplayPlayer.value = true;
           break;
 
         case 'lobbyClosed': {
@@ -487,6 +560,10 @@ const _requestLobbyList = () => {
 const handleJoinLobby = (targetLobbyId: string) => {
   if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
   
+  // Close replay browser when joining a lobby
+  showReplayBrowser.value = false;
+  showReplayPlayer.value = false;
+  
   ws.value.send(JSON.stringify({
     type: 'joinLobby',
     payload: {
@@ -500,6 +577,10 @@ const handleJoinLobby = (targetLobbyId: string) => {
 const handleSpectateGame = (targetLobbyId: string) => {
   if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
   
+  // Close replay browser when spectating
+  showReplayBrowser.value = false;
+  showReplayPlayer.value = false;
+  
   ws.value.send(JSON.stringify({
     type: 'joinLobbyAsSpectator',
     payload: {
@@ -512,6 +593,10 @@ const handleSpectateGame = (targetLobbyId: string) => {
 
 const handleCreateLobby = (settings: LobbySettings) => {
   if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  
+  // Close replay browser when creating a lobby
+  showReplayBrowser.value = false;
+  showReplayPlayer.value = false;
   
   ws.value.send(JSON.stringify({
     type: 'createLobby',
@@ -565,6 +650,57 @@ const handlePlayAgain = () => {
   }));
 };
 
+const handleSaveReplay = () => {
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN || !replayAvailable.value) return;
+  
+  savingReplay.value = true;
+  ws.value.send(JSON.stringify({
+    type: 'saveReplay',
+  }));
+};
+
+const handleOpenReplayBrowser = () => {
+  // Ensure WebSocket connection is established
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) {
+    console.log('[Replay] No WebSocket connection, establishing one...');
+    connectWebSocket();
+    // Wait a bit for connection to establish, then open replay browser
+    setTimeout(() => {
+      if (ws.value && ws.value.readyState === WebSocket.OPEN) {
+        console.log('[Replay] Connection established, opening replay browser');
+        showReplayBrowser.value = true;
+        // ReplayBrowser component will request replays on mount
+      } else {
+        console.error('[Replay] Failed to establish WebSocket connection');
+        alert('Could not connect to server. Please try again.');
+      }
+    }, 500);
+    return;
+  }
+  
+  console.log('[Replay] Opening replay browser');
+  showReplayBrowser.value = true;
+  // ReplayBrowser component will request replays on mount
+};
+
+const handleWatchReplay = (replayId: string) => {
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  
+  ws.value.send(JSON.stringify({
+    type: 'loadReplay',
+    payload: { replayId },
+  }));
+};
+
+const handleCloseReplayBrowser = () => {
+  showReplayBrowser.value = false;
+};
+
+const handleCloseReplayPlayer = () => {
+  showReplayPlayer.value = false;
+  currentReplayData.value = null;
+};
+
 const handleQuitToLobby = () => {
   if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
   
@@ -587,6 +723,40 @@ const handleQuitToLobby = () => {
   // Show lobby browser
   showLobby.value = false;
   showBrowser.value = true;
+};
+
+// Handle virtual D-pad direction input (for mobile)
+const handleDPadDirection = (direction: 'up' | 'down' | 'left' | 'right') => {
+  if (gameState.value !== 'playing') return;
+
+  const isOpposite = (
+    (currentDirection.value === 'up' && direction === 'down') ||
+    (currentDirection.value === 'down' && direction === 'up') ||
+    (currentDirection.value === 'left' && direction === 'right') ||
+    (currentDirection.value === 'right' && direction === 'left')
+  );
+
+  if (isOpposite) {
+    // Don't allow opposite direction, but don't brake either
+    return;
+  } else {
+    currentDirection.value = direction;
+    ws.value?.send(JSON.stringify({
+      type: 'move',
+      payload: { direction }
+    }));
+  }
+};
+
+// Handle virtual D-pad brake input (for mobile)
+const handleDPadBrake = (braking: boolean) => {
+  if (gameState.value !== 'playing') return;
+
+  isBraking.value = braking;
+  ws.value?.send(JSON.stringify({
+    type: 'brake',
+    payload: { braking }
+  }));
 };
 
 const setupKeyboardListeners = () => {
@@ -857,9 +1027,31 @@ const toggleYoutube = () => {
   }
 };
 
-onMounted(() => {
-  const cleanup = setupKeyboardListeners();
+// Lifecycle hooks - properly separated
+let keyboardCleanup: (() => void) | null = null;
 
+onMounted(() => {
+  // Load player settings
+  loadSettings();
+  
+  if (!isConfigured.value) {
+    // Generate random color for first-time users
+    const color = generateRandomColor();
+    tempColor.value = color.hsl;
+    tempColorHex.value = color.hex;
+    showNameDialog.value = true;
+  } else {
+    // Use saved settings
+    tempName.value = playerSettings.value.name || '';
+    tempColor.value = playerSettings.value.color || 'hsl(180, 90%, 60%)';
+    tempColorHex.value = playerSettings.value.colorHex || '#00ffff';
+    connectWebSocket();
+  }
+
+  // Setup keyboard listeners
+  keyboardCleanup = setupKeyboardListeners();
+
+  // Initialize canvas
   nextTick(() => {
     if (canvasRef.value) {
       // Always set a minimum size
@@ -912,14 +1104,16 @@ onMounted(() => {
     });
     };
   }
+});
 
-  onUnmounted(() => {
-    cleanup();
-    ws.value?.close();
-    if (youtubePlayer.value) {
-      youtubePlayer.value.pauseVideo();
-    }
-  });
+onUnmounted(() => {
+  if (keyboardCleanup) {
+    keyboardCleanup();
+  }
+  ws.value?.close();
+  if (youtubePlayer.value) {
+    youtubePlayer.value.pauseVideo();
+  }
 });
 </script>
 
@@ -1027,6 +1221,7 @@ onMounted(() => {
         @spectate-game="handleSpectateGame"
         @create-lobby="showCreateDialog = true"
         @change-settings="changePlayerSettings"
+        @open-replays="handleOpenReplayBrowser"
       />
     </div>
 
@@ -1036,6 +1231,23 @@ onMounted(() => {
       @create="handleCreateLobby"
       @cancel="showCreateDialog = false"
     />
+
+    <!-- Replay Browser -->
+    <div v-if="showReplayBrowser" class="replay-browser-overlay">
+      <ReplayBrowser
+        :ws="ws"
+        @watch="handleWatchReplay"
+        @close="handleCloseReplayBrowser"
+      />
+    </div>
+
+    <!-- Replay Player -->
+    <div v-if="showReplayPlayer" class="replay-player-overlay">
+      <ReplayPlayer
+        :replay-data="currentReplayData"
+        @close="handleCloseReplayPlayer"
+      />
+    </div>
 
     <!-- Lobby Panel (in lobby, waiting) -->
     <div v-if="showLobby && lobbyState && gameState !== 'playing'" class="lobby-overlay">
@@ -1073,6 +1285,14 @@ onMounted(() => {
           <span v-else>Draw - Everyone crashed!</span>
         </p>
         <div class="game-over-actions">
+          <button 
+            v-if="replayAvailable && !isSpectator" 
+            @click="handleSaveReplay" 
+            class="game-over-btn save-replay-btn"
+            :disabled="savingReplay"
+          >
+            {{ savingReplay ? '💾 Saving...' : '💾 Save Replay' }}
+          </button>
           <button @click="handlePlayAgain" class="game-over-btn replay-btn">
             🔄 Play Again
           </button>
@@ -1127,6 +1347,13 @@ onMounted(() => {
     <div v-if="!showNameDialog && !showBrowser && lobbyId" class="game-board">
       <canvas ref="canvasRef" style="border: 2px solid #0ff; background-color: #000;"></canvas>
     </div>
+
+    <!-- Virtual D-Pad (mobile controls) -->
+    <VirtualDPad
+      :is-visible="gameState === 'playing' && !isSpectator"
+      @direction="handleDPadDirection"
+      @brake="handleDPadBrake"
+    />
   </div>
 </template>
 
@@ -1240,7 +1467,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 2000;
   pointer-events: none;
 }
 
@@ -1301,6 +1528,24 @@ onMounted(() => {
   background: #00cccc;
   transform: scale(1.05);
   box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+}
+
+.save-replay-btn {
+  background: rgba(138, 43, 226, 0.3);
+  color: #fff;
+  border-color: rgba(138, 43, 226, 0.6);
+}
+
+.save-replay-btn:hover:not(:disabled) {
+  background: rgba(138, 43, 226, 0.5);
+  border-color: rgba(138, 43, 226, 0.8);
+  transform: scale(1.05);
+  box-shadow: 0 0 20px rgba(138, 43, 226, 0.4);
+}
+
+.save-replay-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .quit-btn {
@@ -1730,5 +1975,87 @@ canvas {
   pointer-events: none;
   width: 0;
   height: 0;
+}
+
+/* Replay overlays */
+.replay-browser-overlay,
+.replay-player-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1600; /* Higher than lobby-browser-overlay (1500) */
+  padding: 2rem;
+}
+
+/* Mobile-friendly enhancements */
+@media (max-width: 1024px) {
+  /* Prevent text selection during touch */
+  .game-container {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: none; /* Prevent pull-to-refresh and other gestures */
+  }
+
+  /* Hide keyboard controls hint on mobile */
+  .controls {
+    display: none;
+  }
+
+  /* Adjust canvas for mobile screens */
+  .game-board {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    padding: 10px;
+  }
+
+  .game-board canvas {
+    max-width: 100%;
+    max-height: calc(100vh - 100px);
+    width: auto !important;
+    height: auto !important;
+    object-fit: contain;
+  }
+
+  /* Make lobby browser more mobile-friendly */
+  .lobby-browser-overlay {
+    padding: 1rem;
+  }
+
+  /* Adjust dialog sizes for mobile */
+  .name-dialog-content {
+    max-width: 90%;
+    padding: 1.5rem;
+  }
+
+  /* Make buttons more touch-friendly */
+  button {
+    min-height: 44px; /* iOS recommended touch target size */
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 480px) {
+  .name-dialog-content {
+    padding: 1rem;
+  }
+
+  .game-over-overlay {
+    padding: 1rem;
+  }
+
+  .game-over-box {
+    padding: 1.5rem;
+    max-width: 90%;
+  }
 }
 </style>

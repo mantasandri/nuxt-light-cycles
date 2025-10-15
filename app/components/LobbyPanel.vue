@@ -50,15 +50,6 @@ const canStart = computed(() => {
          props.lobbyState?.players.length > 0;
 });
 
-// Local settings state for editing
-const localSettings = ref<LobbySettings | null>(null);
-
-watch(() => props.lobbyState?.settings, (newSettings) => {
-  if (newSettings && !localSettings.value) {
-    localSettings.value = { ...newSettings };
-  }
-}, { immediate: true });
-
 const updateGridSize = (size: number) => {
   if (!isHost.value) return;
   emit('updateSettings', { gridSize: size });

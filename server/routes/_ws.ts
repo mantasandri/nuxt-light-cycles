@@ -1,6 +1,8 @@
 // server/routes/_ws.new.ts
 import { lobbyService } from '../services/lobby.service';
 import type { GamePlayer } from '../types/game.types';
+import { ReplayService, type ReplayRecorder } from '../services/replay.service';
+import type { ReplayInitialState } from '../types/replay.types';
 
 interface Peer {
   send: (data: string) => void;
@@ -22,6 +24,7 @@ interface PeerData {
   lobbyId: string | null; // Allow null for browsing state
   isSpectator: boolean; // Track if this peer is spectating
   reconnectToken?: string; // Token for reconnection
+  userId?: string; // Persistent user ID from localStorage
 }
 
 // Map to store connected peers
@@ -33,6 +36,9 @@ const reconnectionSessions = new Map<string, { playerId: string; lobbyId: string
 // Game loop intervals per lobby
 const gameIntervals = new Map<string, NodeJS.Timeout>();
 const countdownIntervals = new Map<string, NodeJS.Timeout>();
+
+// Replay recorders per lobby
+const replayRecorders = new Map<string, ReplayRecorder>();
 
 /**
  * Broadcast to a specific peer
@@ -304,6 +310,40 @@ const startCountdownInterval = (lobbyId: string) => {
         const obstacles = generateObstacles(context.settings.gridSize);
         lobbyService.startGame(lobbyId, obstacles);
         
+        // Start replay recording
+        const recorder = ReplayService.createRecorder();
+        const initialState: ReplayInitialState = {
+          gridSize: context.settings.gridSize,
+          players: context.players.map(p => ({
+            id: p.id,
+            name: p.name,
+            color: p.color,
+            avatar: p.avatar || 'light-cycle',
+            x: p.x,
+            y: p.y,
+            direction: p.direction,
+            isAI: p.id.startsWith('ai-'),
+          })),
+          obstacles: obstacles.map(pos => {
+            const [x, y] = pos.split(',').map(Number);
+            return { x, y };
+          }),
+          settings: {
+            maxPlayers: context.settings.maxPlayers,
+            tickRate: 200, // Current tick rate
+            maxPowerUps: 5,
+          },
+        };
+        recorder.startRecording(initialState, context.settings.lobbyName || `Lobby ${lobbyId}`);
+        replayRecorders.set(lobbyId, recorder);
+        console.log(`[Replay] Started recording for lobby ${lobbyId}`);
+        
+        // Record game start event
+        recorder.recordEvent({
+          type: 'gameStarted',
+          payload: { lobbyId },
+        });
+        
         // Broadcast initial game state immediately
         broadcastLobbyState(lobbyId);
         broadcastGameState(lobbyId);
@@ -467,6 +507,12 @@ const startGameLoop = (lobbyId: string) => {
     lobby.gameActor.send({ type: 'TICK' });
 
     const context = gameSnapshot.context;
+    
+    // Increment replay recorder tick
+    const recorder = replayRecorders.get(lobbyId);
+    if (recorder) {
+      recorder.incrementTick();
+    }
 
     // AI decision making - update AI player directions before movement
     context.players.forEach(player => {
@@ -499,6 +545,14 @@ const startGameLoop = (lobbyId: string) => {
             powerUp: { x, y, type: 'speed' }
           });
           spawned = true;
+          
+          // Record power-up spawn
+          if (recorder) {
+            recorder.recordEvent({
+              type: 'powerUpSpawned',
+              payload: { x, y, type: 'speed' },
+            });
+          }
         }
       }
     }
@@ -558,6 +612,14 @@ const startGameLoop = (lobbyId: string) => {
             lobby.gameActor.send({ type: 'PLAYER_CRASHED', playerId: player.id });
           }
           
+          // Record player crash
+          if (recorder) {
+            recorder.recordEvent({
+              type: 'playerCrashed',
+              payload: { playerId: player.id },
+            });
+          }
+          
           broadcastToLobby(lobbyId, {
             type: 'playerCrashed',
             payload: { playerId: player.id },
@@ -572,6 +634,14 @@ const startGameLoop = (lobbyId: string) => {
               playerId: player.id, 
               powerUpIndex 
             });
+            
+            // Record power-up collection
+            if (recorder) {
+              recorder.recordEvent({
+                type: 'powerUpCollected',
+                payload: { playerId: player.id, powerUpIndex },
+              });
+            }
           }
           player.trail.push(currentPos);
         }
@@ -596,6 +666,23 @@ const startGameLoop = (lobbyId: string) => {
     if (activePlayers.length === 0 || (activePlayers.length === 1 && freshContext.players.length > 1)) {
       const winner = activePlayers.length === 1 ? activePlayers[0].id : null;
       
+      // Check if replay was being recorded BEFORE stopping it
+      const wasRecording = recorder?.isCurrentlyRecording() || false;
+      
+      // Record game over event
+      if (recorder) {
+        recorder.recordEvent({
+          type: 'gameOver',
+          payload: { 
+            winner, 
+            winnerColor: winner ? activePlayers[0].color : null,
+            draw: winner === null 
+          },
+        });
+        recorder.stopRecording();
+        console.log(`[Replay] Stopped recording for lobby ${lobbyId}, actions: ${recorder['actions']?.length || 0}, events: ${recorder['events']?.length || 0}`);
+      }
+      
       // Stop the game loop FIRST
       clearInterval(interval);
       gameIntervals.delete(lobbyId);
@@ -606,7 +693,8 @@ const startGameLoop = (lobbyId: string) => {
         payload: { 
           winner, 
           winnerColor: winner ? activePlayers[0].color : null,
-          draw: winner === null 
+          draw: winner === null,
+          replayAvailable: wasRecording
         },
       });
       
@@ -742,6 +830,19 @@ export default defineWebSocketHandler({
         });
         return;
       }
+    }
+
+    // Handle setUserId (set persistent user ID from client)
+    if (data.type === 'setUserId') {
+      const userId = data.payload.userId;
+      if (userId && typeof userId === 'string') {
+        const currentPeerData = (peer as Peer & { data?: PeerData }).data;
+        if (currentPeerData) {
+          currentPeerData.userId = userId;
+          console.log(`[UserID] Set persistent userId for player ${playerId}: ${userId}`);
+        }
+      }
+      return;
     }
 
     // Handle lobby browsing actions (no lobby required)
@@ -1028,6 +1129,12 @@ export default defineWebSocketHandler({
             gameIntervals.delete(lobbyId);
           }
           
+          // Clean up replay recorder if exists (lobby closing, replay not saved)
+          if (replayRecorders.has(lobbyId)) {
+            console.log(`[Replay] Cleaning up unsaved recorder for lobby ${lobbyId}`);
+            replayRecorders.delete(lobbyId);
+          }
+          
           lobbyService.closeLobby(lobbyId);
           lobbyClosed = true;
         } else {
@@ -1055,6 +1162,80 @@ export default defineWebSocketHandler({
         broadcastLobbyList();
       }
       
+      return;
+    }
+
+    // Handle replay actions (don't require lobby)
+    if (data.type === 'getUserReplays') {
+      try {
+        const peerData = (peer as Peer & { data?: PeerData }).data;
+        const userId = peerData?.userId || playerId;
+        
+        console.log(`[WebSocket] getUserReplays - playerId: ${playerId}, peerData.userId: ${peerData?.userId}, using: ${userId}`);
+        const replays = await ReplayService.getUserReplays(userId);
+        console.log(`[WebSocket] Found ${replays.length} replays for user ${userId}`);
+        sendToPeer(playerId, {
+          type: 'userReplays',
+          payload: { replays },
+        });
+        console.log(`[WebSocket] Sent userReplays response to ${playerId}`);
+      } catch (error) {
+        const peerData = (peer as Peer & { data?: PeerData }).data;
+        const userId = peerData?.userId || playerId;
+        console.error(`[WebSocket] Failed to get replays for user ${userId}:`, error);
+        sendToPeer(playerId, {
+          type: 'error',
+          payload: { message: 'Failed to load replays' },
+        });
+      }
+      return;
+    }
+
+    if (data.type === 'loadReplay') {
+      const replayId = data.payload.replayId;
+      try {
+        const replayData = await ReplayService.loadReplay(replayId);
+        if (!replayData) {
+          sendToPeer(playerId, {
+            type: 'error',
+            payload: { message: 'Replay not found' },
+          });
+          return;
+        }
+
+        sendToPeer(playerId, {
+          type: 'replayData',
+          payload: { replay: replayData },
+        });
+      } catch (error) {
+        console.error(`[WebSocket] Failed to load replay ${replayId}:`, error);
+        sendToPeer(playerId, {
+          type: 'error',
+          payload: { message: 'Failed to load replay' },
+        });
+      }
+      return;
+    }
+
+    if (data.type === 'deleteReplay') {
+      const replayId = data.payload.replayId;
+      const peerData = (peer as Peer & { data?: PeerData }).data;
+      const userId = peerData?.userId || playerId;
+      
+      try {
+        console.log(`[WebSocket] deleteReplay ${replayId} for userId: ${userId}`);
+        await ReplayService.removeReplayFromUser(userId, replayId);
+        sendToPeer(playerId, {
+          type: 'replayDeleted',
+          payload: { replayId, message: 'Replay deleted successfully' },
+        });
+      } catch (error) {
+        console.error(`[WebSocket] Failed to delete replay ${replayId}:`, error);
+        sendToPeer(playerId, {
+          type: 'error',
+          payload: { message: 'Failed to delete replay' },
+        });
+      }
       return;
     }
 
@@ -1127,6 +1308,16 @@ export default defineWebSocketHandler({
             playerId,
             direction: data.payload.direction,
           });
+          
+          // Record player move action
+          const recorder = replayRecorders.get(lobbyId);
+          if (recorder) {
+            recorder.recordAction({
+              playerId,
+              action: 'move',
+              payload: { direction: data.payload.direction },
+            });
+          }
         }
         break;
       }
@@ -1139,6 +1330,16 @@ export default defineWebSocketHandler({
           playerId,
           braking: data.payload.braking,
         });
+        
+        // Record brake action
+        const recorder = replayRecorders.get(lobbyId);
+        if (recorder) {
+          recorder.recordAction({
+            playerId,
+            action: 'brake',
+            payload: { braking: data.payload.braking },
+          });
+        }
         break;
       }
 
@@ -1154,6 +1355,12 @@ export default defineWebSocketHandler({
       case 'returnToLobby': {
         // Transition from finished state back to waiting
         lobbyService.returnToLobby(lobbyId);
+        
+        // Clean up the old replay recorder (if not saved, it's lost)
+        if (replayRecorders.has(lobbyId)) {
+          console.log(`[Replay] Cleaning up recorder for lobby ${lobbyId} (returning to lobby for new game)`);
+          replayRecorders.delete(lobbyId);
+        }
         
         // Auto-ready AI players
         const updatedContext = lobbyService.getLobbyContext(lobbyId);
@@ -1172,6 +1379,59 @@ export default defineWebSocketHandler({
         broadcastLobbyList();
         break;
       }
+
+      case 'saveReplay': {
+        const recorder = replayRecorders.get(lobbyId);
+        const peerData = (peer as Peer & { data?: PeerData }).data;
+        const userId = peerData?.userId || playerId; // Use persistent userId if available, fallback to playerId
+        
+        console.log(`[WebSocket] saveReplay request for lobby ${lobbyId}, recorder exists:`, !!recorder);
+        console.log(`[WebSocket] Using userId: ${userId} (persistent: ${!!peerData?.userId})`);
+        
+        if (!recorder) {
+          console.log(`[WebSocket] No recorder found for lobby ${lobbyId}`);
+          sendToPeer(playerId, {
+            type: 'error',
+            payload: { message: 'No replay available for this game' },
+          });
+          break;
+        }
+
+        try {
+          console.log(`[WebSocket] Recorder status - actions: ${recorder['actions']?.length || 0}, events: ${recorder['events']?.length || 0}`);
+          
+          // Find winner info from lobby context
+          const lobbyCtx = lobbyService.getLobbyContext(lobbyId);
+          const activePlayers = lobbyCtx?.players.filter(p => p.direction !== 'crashed') || [];
+          const winnerPlayer = activePlayers.length === 1 ? activePlayers[0] : null;
+          
+          const winner = winnerPlayer ? {
+            playerId: winnerPlayer.id,
+            name: winnerPlayer.name,
+            color: winnerPlayer.color,
+          } : null;
+
+          console.log(`[WebSocket] Attempting to save replay for userId ${userId}, winner:`, winner?.name || 'draw');
+          const replayId = await recorder.saveReplay(userId, winner);
+          console.log(`[WebSocket] Replay saved successfully with ID: ${replayId}`);
+          
+          sendToPeer(playerId, {
+            type: 'replaySaved',
+            payload: { replayId, message: 'Replay saved successfully!' },
+          });
+          
+          // Clean up recorder
+          replayRecorders.delete(lobbyId);
+        } catch (error) {
+          console.error(`[WebSocket] Failed to save replay for lobby ${lobbyId}:`, error);
+          sendToPeer(playerId, {
+            type: 'error',
+            payload: { message: 'Failed to save replay' },
+          });
+        }
+        break;
+      }
+
     }
   },
 
@@ -1255,6 +1515,12 @@ export default defineWebSocketHandler({
           if (interval) {
             clearInterval(interval);
             gameIntervals.delete(lobbyId);
+          }
+          
+          // Clean up replay recorder if exists (lobby closing, replay not saved)
+          if (replayRecorders.has(lobbyId)) {
+            console.log(`[Replay] Cleaning up unsaved recorder for lobby ${lobbyId} (player disconnect)`);
+            replayRecorders.delete(lobbyId);
           }
           
           lobbyService.closeLobby(lobbyId);
