@@ -1,5 +1,5 @@
 {
-  "name": "nuxt-app",
+  "name": "circuit-breaker",
   "private": true,
   "type": "module",
   "scripts": {

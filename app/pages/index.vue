@@ -1145,7 +1145,7 @@ onUnmounted(() => {
     <!-- Name/Color Dialog -->
     <div v-if="showNameDialog" class="name-dialog">
       <div class="name-dialog-content">
-        <h2>{{ isConfigured ? 'Update Settings' : 'Welcome to Light Cycles!' }}</h2>
+        <h2>{{ isConfigured ? 'Update Settings' : 'Welcome to Circuit Breaker!' }}</h2>
         <div class="input-group">
           <label for="playerName">Your Name:</label>
           <input 
