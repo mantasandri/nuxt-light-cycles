@@ -71,6 +71,9 @@ interface _LobbyInfo {
 // Player settings
 const { settings: playerSettings, isConfigured, loadSettings, saveSettings } = usePlayerSettings();
 
+// Game audio
+const { playGameOverSound } = useGameAudio();
+
 // UI State
 const showWelcome = ref(false);
 const showNameDialog = ref(false);
@@ -109,6 +112,13 @@ const obstacles = ref<string[]>([]);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 let ctx: CanvasRenderingContext2D | null = null;
 const cellSize = 20;
+
+// Performance optimizations - canvas caching
+let gridCanvas: HTMLCanvasElement | null = null;
+let gridCtx: CanvasRenderingContext2D | null = null;
+let cachedGridSize = 0;
+let lastObstaclesHash = '';
+let lastPowerUpsHash = '';
 
 // Current player (for boost status display)
 const currentPlayer = computed(() => {
@@ -435,7 +445,11 @@ const connectWebSocket = () => {
               if (ctx) {
                 ctx.imageSmoothingEnabled = false;
               }
-              drawGame();
+              
+              // Pre-generate grid cache to avoid first-frame delay
+              createGridCache(currentGridSize.value);
+              
+              // Don't call drawGame() here - wait for first gameState message with player data
             }
           } else if (data.payload.state === 'waiting') {
             gameState.value = 'waiting';
@@ -486,6 +500,65 @@ const connectWebSocket = () => {
           break;
         }
 
+        case 'gameStateDelta': {
+          // Handle delta updates for performance
+          const delta = data.payload as {
+            isDelta: boolean;
+            players: Array<{
+              id: string;
+              x: number;
+              y: number;
+              direction: 'up' | 'down' | 'left' | 'right' | 'crashed';
+              trailDelta: string[];
+              speed: number;
+              speedBoostUntil: number | null;
+              isBraking: boolean;
+              hasShield: boolean;
+              hasTrailEraser: boolean;
+            }>;
+            powerUps?: PowerUp[];
+          };
+          
+          // Update player positions and append trail deltas
+          gamePlayers.value = gamePlayers.value.map(player => {
+            const deltaPlayer = delta.players.find(p => p.id === player.id);
+            if (!deltaPlayer) return player;
+            
+            const isNewlyCrashed = deltaPlayer.direction === 'crashed' && !crashedPlayers.value.includes(player.id);
+            if (isNewlyCrashed) {
+              crashedPlayers.value.push(player.id);
+            }
+
+            if (player.id === playerId.value) {
+              currentDirection.value = deltaPlayer.direction;
+            }
+
+            // Append new trail segments to existing trail
+            const updatedTrail = [...player.trail, ...(deltaPlayer.trailDelta || [])];
+            
+            return {
+              ...player,
+              x: deltaPlayer.x,
+              y: deltaPlayer.y,
+              direction: deltaPlayer.direction,
+              trail: updatedTrail,
+              speed: deltaPlayer.speed,
+              speedBoostUntil: deltaPlayer.speedBoostUntil,
+              isBraking: deltaPlayer.isBraking,
+              hasShield: deltaPlayer.hasShield || false,
+              hasTrailEraser: deltaPlayer.hasTrailEraser || false,
+            };
+          });
+
+          // Update power-ups if included in delta
+          if (delta.powerUps) {
+            powerUps.value = delta.powerUps;
+          }
+
+          drawGame();
+          break;
+        }
+
         case 'countdown':
           countdown.value = data.payload.count;
           gameState.value = 'starting';
@@ -523,6 +596,10 @@ const connectWebSocket = () => {
           console.log('[Client] Replay available:', replayAvailable.value);
           console.log('[Client] Is spectator:', isSpectator.value);
           console.log('[Client] Winner:', winner.value);
+          
+          // Play game over sound
+          playGameOverSound();
+          
           drawGame();
           break;
 
@@ -904,6 +981,47 @@ const getTrailColor = (color: string | undefined) => {
   return `${color}66`;
 };
 
+// Create or update cached grid canvas
+const createGridCache = (gridSize: number) => {
+  const size = gridSize * cellSize;
+  
+  // Create offscreen canvas if needed
+  if (!gridCanvas) {
+    gridCanvas = document.createElement('canvas');
+    gridCtx = gridCanvas.getContext('2d', { alpha: false });
+  }
+  
+  if (!gridCtx) return;
+  
+  // Resize if needed
+  if (gridCanvas.width !== size || gridCanvas.height !== size) {
+    gridCanvas.width = size;
+    gridCanvas.height = size;
+  }
+  
+  // Draw grid to offscreen canvas
+  gridCtx.fillStyle = '#000';
+  gridCtx.fillRect(0, 0, size, size);
+  
+  gridCtx.strokeStyle = '#333';
+  gridCtx.lineWidth = 0.5;
+  
+  for (let i = 0; i <= gridSize; i++) {
+    const pos = i * cellSize;
+    gridCtx.beginPath();
+    gridCtx.moveTo(pos, 0);
+    gridCtx.lineTo(pos, size);
+    gridCtx.stroke();
+    
+    gridCtx.beginPath();
+    gridCtx.moveTo(0, pos);
+    gridCtx.lineTo(size, pos);
+    gridCtx.stroke();
+  }
+  
+  cachedGridSize = gridSize;
+};
+
 const drawGame = () => {
   const canvasEl = canvasRef.value;
   
@@ -934,33 +1052,53 @@ const drawGame = () => {
     }
   }
   
-  ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-
-  // Draw grid
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 0.5;
-  for (let i = 0; i <= currentGridSize.value; i++) {
-    const pos = i * cellSize;
-    ctx.beginPath();
-    ctx.moveTo(pos, 0);
-    ctx.lineTo(pos, canvasEl.height);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, pos);
-    ctx.lineTo(canvasEl.width, pos);
-    ctx.stroke();
+  // Draw cached grid background (performance optimization)
+  if (gridCanvas && cachedGridSize === currentGridSize.value) {
+    // Use cached grid
+    ctx.drawImage(gridCanvas, 0, 0);
+  } else {
+    // Cache not ready or size changed - regenerate
+    if (cachedGridSize !== currentGridSize.value) {
+      createGridCache(currentGridSize.value);
+    }
+    if (gridCanvas) {
+      ctx.drawImage(gridCanvas, 0, 0);
+    } else {
+      // Extreme fallback
+      ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+    }
   }
+  
+  // Null check for context (safety)
+  if (!ctx) return;
 
-  // Draw trails and players
+  // Draw obstacles first (static)
+  ctx.fillStyle = '#444';
+  obstacles.value.forEach(pos => {
+    const coords = pos.split(',').map(Number);
+    if (coords.length === 2 && !coords.some(isNaN) && coords[0] !== undefined && coords[1] !== undefined) {
+      ctx.fillRect(coords[0] * cellSize, coords[1] * cellSize, cellSize, cellSize);
+    }
+  });
+
+  // Draw trails using Path2D for better performance
   gamePlayers.value.forEach(player => {
+    if (player.trail.length === 0) return;
+    
     const trailColor = getTrailColor(player.color);
     ctx.fillStyle = trailColor;
+    
+    // Use Path2D to batch all trail segments
+    const trailPath = new Path2D();
     player.trail.forEach(pos => {
       const coords = pos.split(',').map(Number);
       if (coords.length === 2 && !coords.some(isNaN) && coords[0] !== undefined && coords[1] !== undefined) {
-        ctx.fillRect(coords[0] * cellSize, coords[1] * cellSize, cellSize, cellSize);
+        trailPath.rect(coords[0] * cellSize, coords[1] * cellSize, cellSize, cellSize);
       }
     });
+    
+    // Single fill operation for entire trail
+    ctx.fill(trailPath);
 
     // Visual effects for player state
     if (player.speedBoostUntil && Date.now() < player.speedBoostUntil) {
@@ -1130,15 +1268,6 @@ const drawGame = () => {
         ctx.lineTo(x + cellSize/3, y + 2*cellSize/3);
         ctx.stroke();
       }
-    }
-  });
-
-  // Draw obstacles
-  ctx.fillStyle = '#444';
-  obstacles.value.forEach(pos => {
-    const coords = pos.split(',').map(Number);
-    if (coords.length === 2 && !coords.some(isNaN) && coords[0] !== undefined && coords[1] !== undefined) {
-      ctx.fillRect(coords[0] * cellSize, coords[1] * cellSize, cellSize, cellSize);
     }
   });
   

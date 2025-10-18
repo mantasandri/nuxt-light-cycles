@@ -26,15 +26,16 @@ const emit = defineEmits<{
       </p>
     </div>
     
-    <CircuitButton
+    <button
       v-if="showClose"
-      variant="ghost"
-      size="sm"
-      class="!text-[32px] leading-none !p-0 !min-w-[32px] !min-h-[32px] shrink-0 transition-all hover:rotate-90"
+      class="w-8 h-8 flex items-center justify-center shrink-0 border-2 border-gray-600 rounded-lg bg-gray-400/20 hover:bg-gray-400/30 hover:border-gray-500 transition-all hover:rotate-90 active:scale-95"
       @click="emit('close')"
     >
-      ×
-    </CircuitButton>
+      <svg class="w-4 h-4 text-gray-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="3" y1="3" x2="13" y2="13" />
+        <line x1="13" y1="3" x2="3" y2="13" />
+      </svg>
+    </button>
   </div>
 </template>
 
