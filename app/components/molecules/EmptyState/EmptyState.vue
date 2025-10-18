@@ -33,15 +33,15 @@ const iconSize = computed(() => {
   <div
     :class="[
       'text-center flex flex-col items-center text-cyan-400/70',
-      size === 'sm' && 'gap-2.5 py-10 px-5',
-      size === 'md' && 'gap-4 py-15 px-5',
-      size === 'lg' && 'gap-5 py-20 px-5'
+      size === 'sm' && 'gap-3 py-10 px-5',
+      size === 'md' && 'gap-6 py-16 px-5',
+      size === 'lg' && 'gap-8 py-20 px-5'
     ]"
   >
     <CircuitIcon
       v-if="icon"
       :name="icon"
-      class="opacity-60 leading-none"
+      class="opacity-60 leading-none flex-shrink-0"
       :style="{ fontSize: iconSize }"
     />
     
