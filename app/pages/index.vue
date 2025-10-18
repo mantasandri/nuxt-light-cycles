@@ -1,12 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { usePlayerSettings, AVATAR_OPTIONS } from '~/composables/usePlayerSettings';
-import LobbyPanel from '~/components/LobbyPanel.vue';
-import LobbyBrowser from '~/components/LobbyBrowser.vue';
-import CreateLobbyDialog from '~/components/CreateLobbyDialog.vue';
-import ReplayBrowser from '~/components/ReplayBrowser.vue';
-import ReplayPlayer from '~/components/ReplayPlayer.vue';
-import VirtualDPad from '~/components/VirtualDPad.vue';
+// Note: All components are auto-imported by Nuxt
+// LobbyPanel, LobbyBrowser, CreateLobbyDialog, ReplayBrowser, ReplayPlayer, VirtualDPad, WelcomeScreen
 
 interface PowerUp {
   x: number;
@@ -76,6 +72,7 @@ interface _LobbyInfo {
 const { settings: playerSettings, isConfigured, loadSettings, saveSettings } = usePlayerSettings();
 
 // UI State
+const showWelcome = ref(false);
 const showNameDialog = ref(false);
 const showBrowser = ref(false);
 const showLobby = ref(false);
@@ -85,6 +82,7 @@ const showReplayBrowser = ref(false);
 const showReplayPlayer = ref(false);
 const replayAvailable = ref(false);
 const savingReplay = ref(false);
+const replaySavedMessage = ref<string | null>(null);
 
 // WebSocket
 const ws = ref<WebSocket | null>(null);
@@ -133,8 +131,8 @@ const hasAnyBoost = computed(() => {
 const isBraking = ref(false);
 const currentDirection = ref<string>('');
 
-// Lobby browser
-const lobbyBrowser = ref<InstanceType<typeof LobbyBrowser> | null>(null);
+// Lobby browser - using component instance type
+const lobbyBrowser = ref<{ updateLobbies: (lobbies: unknown[]) => void } | null>(null);
 
 // Replay system
 interface ReplayData {
@@ -268,6 +266,19 @@ const savePlayerSettings = () => {
   });
   
   showNameDialog.value = false;
+  
+  // Show welcome screen only on first-time setup
+  const hasSeenWelcome = sessionStorage.getItem('hasSeenWelcome');
+  if (!hasSeenWelcome) {
+    showWelcome.value = true;
+  } else {
+    connectWebSocket();
+  }
+};
+
+const handleWelcomeContinue = () => {
+  showWelcome.value = false;
+  sessionStorage.setItem('hasSeenWelcome', 'true');
   connectWebSocket();
 };
 
@@ -520,7 +531,11 @@ const connectWebSocket = () => {
           savingReplay.value = false;
           replayAvailable.value = false;
           // Show success message
-          alert(data.payload.message || 'Replay saved successfully!');
+          replaySavedMessage.value = data.payload.message || 'Replay saved successfully!';
+          // Auto-hide after 3 seconds
+          setTimeout(() => {
+            replaySavedMessage.value = null;
+          }, 3000);
           break;
 
         case 'replayData':
@@ -1161,7 +1176,14 @@ onMounted(() => {
     tempName.value = playerSettings.value.name || '';
     tempColor.value = playerSettings.value.color || 'hsl(180, 90%, 60%)';
     tempColorHex.value = playerSettings.value.colorHex || '#00ffff';
-    connectWebSocket();
+    
+    // Check if we should show welcome screen (only once per session for returning users)
+    const hasSeenWelcome = sessionStorage.getItem('hasSeenWelcome');
+    if (!hasSeenWelcome) {
+      showWelcome.value = true;
+    } else {
+      connectWebSocket();
+    }
   }
 
   // Setup keyboard listeners
@@ -1238,15 +1260,21 @@ onUnmounted(() => {
 
 <template>
   <div class="game-container">
+    <!-- Welcome Screen -->
+    <WelcomeScreen 
+      v-if="showWelcome"
+      @continue="handleWelcomeContinue"
+    />
+    
     <!-- Music controls -->
-    <div v-if="!showNameDialog && !showBrowser" class="music-controls">
+    <div v-if="!showNameDialog && !showBrowser && !showWelcome" class="music-controls">
       <button @click="toggleYoutube" class="music-btn">
         {{ isYoutubePlaying ? '🔇 Mute' : '🔊 Play Music' }}
       </button>
     </div>
 
     <!-- Controls info -->
-    <div v-if="!showNameDialog && !showBrowser && gameState === 'playing'" class="controls">
+    <div v-if="!showNameDialog && !showBrowser && !showWelcome && gameState === 'playing'" class="controls">
       <p>Game Controls</p>
       <div class="key-controls">
         <div class="key">↑</div>
@@ -1460,9 +1488,26 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <!-- Replay Saved Notification -->
+    <Transition name="fade">
+      <div v-if="replaySavedMessage" class="fixed top-20 left-1/2 -translate-x-1/2 z-[3000] bg-cyan-950/95 border-2 border-cyan-400 rounded-xl px-8 py-4 shadow-[0_0_30px_rgba(0,255,255,0.5)] backdrop-blur-sm">
+        <div class="flex items-center gap-4">
+          <span class="text-4xl">✅</span>
+          <div>
+            <p class="text-cyan-400 text-lg font-semibold m-0 [text-shadow:0_0_10px_rgba(0,255,255,0.5)]">
+              {{ replaySavedMessage }}
+            </p>
+            <p class="text-gray-400 text-sm m-0 mt-1">
+              View it in My Replays
+            </p>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
     <!-- Debug toggle -->
     <button 
-      v-if="!showNameDialog && !showBrowser"
+      v-if="!showNameDialog && !showBrowser && !showWelcome"
       @click="showDebug = !showDebug" 
       class="debug-toggle"
       :class="{ 'is-active': showDebug }"
@@ -1486,10 +1531,11 @@ onUnmounted(() => {
             gameState,
             countdown,
             isReady,
+            showWelcome,
             showLobby,
             showBrowser,
             showNameDialog,
-            canvasVisible: !showNameDialog && !showBrowser
+            canvasVisible: !showNameDialog && !showBrowser && !showWelcome
           }, null, 2) }}</pre>
         </div>
       </div>
@@ -1501,7 +1547,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Game canvas (only show when in a lobby or game) -->
-    <div v-if="!showNameDialog && !showBrowser && lobbyId" class="game-board">
+    <div v-if="!showNameDialog && !showBrowser && !showWelcome && lobbyId" class="game-board">
       <canvas ref="canvasRef" style="border: 2px solid #0ff; background-color: #000;"></canvas>
     </div>
 
@@ -2317,5 +2363,17 @@ canvas {
     padding: 1.5rem;
     max-width: 90%;
   }
+}
+
+/* Fade transition for notification */
+.fade-enter-active,
+.fade-leave-active {
+  transition: all 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-10px);
 }
 </style>

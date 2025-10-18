@@ -6,7 +6,7 @@ export default defineNuxtConfig({
   modules: [
     '@nuxt/image',
     '@nuxt/scripts',
-    '@nuxt/ui',
+    '@nuxtjs/tailwindcss',
     '@nuxt/eslint'
   ],
   
@@ -28,5 +28,12 @@ export default defineNuxtConfig({
     experimental: {
       websocket: true
     }
-  }
+  },
+
+  components: [
+    {
+      path: '@/components',
+      pathPrefix: false,
+    },
+  ],
 })
