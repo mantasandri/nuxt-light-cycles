@@ -1,5 +1,4 @@
 // app/composables/usePlayerSettings.ts
-import { ref, watch } from 'vue';
 import { nanoid } from 'nanoid';
 
 export interface PlayerSettings {

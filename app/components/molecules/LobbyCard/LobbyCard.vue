@@ -1,5 +1,4 @@
 <script setup lang="ts">
-
 interface Props {
   lobbyId: string;
   hostName: string;

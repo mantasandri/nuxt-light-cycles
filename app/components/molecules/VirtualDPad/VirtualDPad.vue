@@ -81,13 +81,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-
 interface Props {
   isVisible?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   isVisible: true,
 });
 

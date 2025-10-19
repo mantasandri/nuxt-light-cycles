@@ -1,5 +1,4 @@
 <script setup lang="ts">
-
 interface Props {
   playerId: string;
   name: string;

@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
-
 interface LobbyInfo {
   lobbyId: string;
   playerCount: number;

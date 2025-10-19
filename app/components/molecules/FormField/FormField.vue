@@ -1,5 +1,4 @@
 <script setup lang="ts">
-
 interface Option {
   value: string | number;
   label: string;
