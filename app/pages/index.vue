@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
-import { usePlayerSettings, AVATAR_OPTIONS } from '~/composables/usePlayerSettings'
-// Note: All components are auto-imported by Nuxt
-// LobbyPanel, LobbyBrowser, CreateLobbyDialog, ReplayBrowser, ReplayPlayer, VirtualDPad, WelcomeScreen
+import { AVATAR_OPTIONS } from '~/composables/usePlayerSettings'
 
 interface PowerUp {
   x: number;
@@ -55,17 +52,6 @@ interface LobbyState {
   hostId: string | null;
   countdownRemaining: number | null;
   roundNumber: number;
-}
-
-// Lobby info interface (used for type checking)
-interface _LobbyInfo {
-  lobbyId: string;
-  playerCount: number;
-  maxPlayers: number;
-  gridSize: number;
-  isPrivate: boolean;
-  hostName: string;
-  state: string;
 }
 
 // Player settings
