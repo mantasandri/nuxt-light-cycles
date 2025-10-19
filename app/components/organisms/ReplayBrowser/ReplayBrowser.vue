@@ -147,7 +147,7 @@ onUnmounted(() => {
 
     <div class="p-8 overflow-y-auto flex-1 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-black/30 [&::-webkit-scrollbar-track]:rounded [&::-webkit-scrollbar-thumb]:bg-cyan-400/30 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb:hover]:bg-cyan-400/50">
       <div v-if="loading" class="flex flex-col items-center justify-center p-12 text-cyan-400">
-        <div class="w-10 h-10 border-[3px] border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin mb-4"></div>
+        <div class="w-10 h-10 border-[3px] border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin mb-4"/>
         <p>Loading replays...</p>
       </div>
 

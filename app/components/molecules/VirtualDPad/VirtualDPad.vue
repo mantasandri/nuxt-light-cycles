@@ -1,13 +1,13 @@
 <template>
-  <div class="dpad-container" v-show="isVisible">
+  <div v-show="isVisible" class="dpad-container">
     <!-- Brake button (top left) -->
     <button
       class="brake-button"
+      :class="{ active: isBraking }"
       @touchstart.prevent="handleBrakeStart"
       @touchend.prevent="handleBrakeEnd"
       @mousedown.prevent="handleBrakeStart"
       @mouseup.prevent="handleBrakeEnd"
-      :class="{ active: isBraking }"
     >
       <span class="brake-icon">🛑</span>
       <span class="brake-label">BRAKE</span>

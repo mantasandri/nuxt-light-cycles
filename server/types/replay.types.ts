@@ -17,7 +17,7 @@ export interface PlayerAction {
 export interface GameEvent {
   tick: number;
   type: 'playerCrashed' | 'powerUpSpawned' | 'powerUpCollected' | 'gameStarted' | 'gameOver' | 'positionSnapshot';
-  payload: any;
+  payload: Record<string, unknown>;
   timestamp: number;
 }
 

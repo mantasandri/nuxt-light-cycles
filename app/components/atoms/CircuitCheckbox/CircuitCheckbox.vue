@@ -7,11 +7,11 @@ interface Props {
   variant?: 'default' | 'inline';
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   modelValue: false,
   disabled: false,
   variant: 'default',
-});
+})
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean];
@@ -41,7 +41,7 @@ const handleChange = (event: Event) => {
       :checked="modelValue"
       :disabled="disabled"
       @change="handleChange"
-    />
+    >
     
     <!-- Custom checkbox box -->
     <span

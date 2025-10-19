@@ -12,7 +12,7 @@ interface Props {
   isAIBot?: boolean; // Is this an AI bot
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   isReady: false,
   isHost: false,
   isYou: false,
@@ -20,7 +20,7 @@ const props = withDefaults(defineProps<Props>(), {
   size: 'md',
   showHostControls: false,
   isAIBot: false,
-});
+})
 
 const emit = defineEmits<{
   kick: [playerId: string];
@@ -99,8 +99,8 @@ const sizeMap = {
         v-if="isAIBot"
         variant="danger"
         size="sm"
-        @click="emit('removeBot', playerId)"
         title="Remove bot"
+        @click="emit('removeBot', playerId)"
       >
         ❌
       </CircuitButton>
@@ -108,16 +108,16 @@ const sizeMap = {
         <CircuitButton
           variant="ghost"
           size="sm"
-          @click="emit('kick', playerId)"
           title="Kick player"
+          @click="emit('kick', playerId)"
         >
           👢
         </CircuitButton>
         <CircuitButton
           variant="danger"
           size="sm"
-          @click="emit('ban', playerId)"
           title="Ban player"
+          @click="emit('ban', playerId)"
         >
           🚫
         </CircuitButton>

@@ -117,8 +117,6 @@ const cellSize = 20;
 let gridCanvas: HTMLCanvasElement | null = null;
 let gridCtx: CanvasRenderingContext2D | null = null;
 let cachedGridSize = 0;
-let lastObstaclesHash = '';
-let lastPowerUpsHash = '';
 
 // Current player (for boost status display)
 const currentPlayer = computed(() => {
@@ -1467,7 +1465,7 @@ onUnmounted(() => {
     
     <!-- Music controls -->
     <div v-if="!showNameDialog && !showBrowser && !showWelcome" class="music-controls">
-      <button @click="toggleYoutube" class="music-btn">
+      <button class="music-btn" @click="toggleYoutube">
         {{ isYoutubePlaying ? '🔇 Mute' : '🔊 Play Music' }}
       </button>
     </div>
@@ -1535,10 +1533,10 @@ onUnmounted(() => {
           <input 
             id="playerName"
             v-model="tempName" 
-            @keyup.enter="savePlayerSettings"
             placeholder="Enter your name"
             maxlength="20"
             class="name-input"
+            @keyup.enter="savePlayerSettings"
           >
         </div>
         
@@ -1550,10 +1548,10 @@ onUnmounted(() => {
               :key="avatar.id"
               class="avatar-option"
               :class="{ 'selected': tempAvatar === avatar.id }"
-              @click="tempAvatar = avatar.id"
               :title="avatar.label"
+              @click="tempAvatar = avatar.id"
             >
-              <div class="avatar-icon" v-html="avatar.svg"></div>
+              <div class="avatar-icon" v-html="avatar.svg"/>
             </div>
           </div>
         </div>
@@ -1562,26 +1560,27 @@ onUnmounted(() => {
           <label>Your Color:</label>
           <div class="color-picker">
             <input 
-              type="color" 
-              v-model="tempColorHex"
+              v-model="tempColorHex" 
+              type="color"
               class="hidden-color-input"
               @input="tempColor = hexToHSL(tempColorHex) || tempColor"
-            />
+            >
             <div 
               class="color-square" 
               :style="{ backgroundColor: tempColor }"
               @click="handleColorSquareClick"
-            ></div>
-            <button @click="() => {
+            />
+            <button
+class="random-color-btn" @click="() => {
               const color = generateRandomColor();
               tempColor = color.hsl;
               tempColorHex = color.hex;
-            }" class="random-color-btn">
+            }">
               🎲 Random Color
             </button>
           </div>
         </div>
-        <button @click="savePlayerSettings" class="start-btn">
+        <button class="start-btn" @click="savePlayerSettings">
           {{ isConfigured ? 'Save & Continue' : 'Continue' }}
         </button>
       </div>
@@ -1590,7 +1589,7 @@ onUnmounted(() => {
     <!-- Reconnection overlay -->
     <div v-if="isReconnecting" class="reconnection-overlay">
       <div class="reconnection-box">
-        <div class="reconnection-spinner"></div>
+        <div class="reconnection-spinner"/>
         <p class="reconnection-text">Reconnecting to server...</p>
         <p class="reconnection-attempt">Attempt {{ reconnectAttempts }} of 5</p>
       </div>
@@ -1675,16 +1674,16 @@ onUnmounted(() => {
         <div class="game-over-actions">
           <button 
             v-if="replayAvailable && !isSpectator" 
-            @click="handleSaveReplay" 
-            class="game-over-btn save-replay-btn"
+            class="game-over-btn save-replay-btn" 
             :disabled="savingReplay"
+            @click="handleSaveReplay"
           >
             {{ savingReplay ? '💾 Saving...' : '💾 Save Replay' }}
           </button>
-          <button @click="handlePlayAgain" class="game-over-btn replay-btn">
+          <button class="game-over-btn replay-btn" @click="handlePlayAgain">
             🔄 Play Again
           </button>
-          <button @click="handleQuitToLobby" class="game-over-btn quit-btn">
+          <button class="game-over-btn quit-btn" @click="handleQuitToLobby">
             🚪 Back to Lobby Browser
           </button>
         </div>
@@ -1711,10 +1710,10 @@ onUnmounted(() => {
     <!-- Debug toggle -->
     <button 
       v-if="!showNameDialog && !showBrowser && !showWelcome"
-      @click="showDebug = !showDebug" 
-      class="debug-toggle"
+      class="debug-toggle" 
       :class="{ 'is-active': showDebug }"
       title="Toggle Debug Info"
+      @click="showDebug = !showDebug"
     >
       ⚙️
     </button>
@@ -1724,7 +1723,7 @@ onUnmounted(() => {
       <div v-if="showDebug" class="debug-modal">
         <div class="debug-header">
           <h3>Debug Info</h3>
-          <button @click="showDebug = false" class="close-btn">×</button>
+          <button class="close-btn" @click="showDebug = false">×</button>
         </div>
         <div class="debug-content">
           <pre>{{ JSON.stringify({
@@ -1746,12 +1745,12 @@ onUnmounted(() => {
 
     <!-- Hidden YouTube player -->
     <div class="hidden-youtube">
-      <div id="youtubePlayer"></div>
+      <div id="youtubePlayer"/>
     </div>
 
     <!-- Game canvas (only show when in a lobby or game) -->
     <div v-if="!showNameDialog && !showBrowser && !showWelcome && lobbyId" class="game-board">
-      <canvas ref="canvasRef" style="border: 2px solid #0ff; background-color: #000;"></canvas>
+      <canvas ref="canvasRef" style="border: 2px solid #0ff; background-color: #000;"/>
     </div>
 
     <!-- Virtual D-Pad (mobile controls) -->

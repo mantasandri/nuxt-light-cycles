@@ -67,7 +67,7 @@ const handleKeyup = (event: KeyboardEvent) => {
     @keyup="handleKeyup"
     @blur="emit('blur')"
     @focus="emit('focus')"
-  />
+  >
 </template>
 
 <style scoped>

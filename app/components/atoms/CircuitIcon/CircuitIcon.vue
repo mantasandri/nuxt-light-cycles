@@ -6,10 +6,10 @@ interface Props {
   animated?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   size: 'md',
   animated: false,
-});
+})
 
 const sizeMap = {
   xs: '12px',

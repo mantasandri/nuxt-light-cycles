@@ -13,13 +13,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   action: [];
-}>();
-
-const sizeMap = {
-  sm: { icon: 'xl', title: '18px', message: '14px', padding: '40px' },
-  md: { icon: 'xl', title: '24px', message: '16px', padding: '60px' },
-  lg: { icon: 'xl', title: '32px', message: '18px', padding: '80px' },
-};
+}>()
 
 const iconSize = computed(() => {
   if (props.size === 'sm') return '48px';

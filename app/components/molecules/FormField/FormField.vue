@@ -19,11 +19,11 @@ interface Props {
   max?: number;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   type: 'text',
   disabled: false,
   required: false,
-});
+})
 
 const emit = defineEmits<{
   'update:modelValue': [value: string | number | boolean];

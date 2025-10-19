@@ -83,7 +83,7 @@ const handleContinue = () => {
               <div class="powerup-info">
                 <h3>Speed Boost</h3>
                 <p>Temporary speed increase to escape tight situations or cut off opponents</p>
-                <div class="powerup-visual"></div>
+                <div class="powerup-visual"/>
               </div>
             </div>
             <div class="powerup-card shield">
@@ -91,7 +91,7 @@ const handleContinue = () => {
               <div class="powerup-info">
                 <h3>Shield</h3>
                 <p>Protects you from one collision with trails or obstacles (not walls!)</p>
-                <div class="powerup-visual"></div>
+                <div class="powerup-visual"/>
               </div>
             </div>
             <div class="powerup-card eraser">
@@ -99,7 +99,7 @@ const handleContinue = () => {
               <div class="powerup-info">
                 <h3>Trail Eraser</h3>
                 <p>Press the same direction twice to erase your trail for a short distance</p>
-                <div class="powerup-visual"></div>
+                <div class="powerup-visual"/>
               </div>
             </div>
           </div>
@@ -131,7 +131,7 @@ const handleContinue = () => {
       </div>
 
       <div class="welcome-footer">
-        <button @click="handleContinue" class="continue-btn">
+        <button class="continue-btn" @click="handleContinue">
           Continue to Lobby Browser
         </button>
         <p class="footer-note">This screen won't show again this session</p>

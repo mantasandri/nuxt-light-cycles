@@ -12,7 +12,7 @@
             <span>{{ replayData?.metadata.gridSize }}x{{ replayData?.metadata.gridSize }}</span>
           </div>
         </div>
-        <button @click="$emit('close')" class="btn-close">
+        <button class="btn-close" @click="$emit('close')">
           ← Back to Replays
         </button>
       </div>
@@ -24,37 +24,37 @@
         :width="canvasSize" 
         :height="canvasSize"
         class="game-canvas"
-      ></canvas>
+      />
     </div>
 
     <div class="controls">
       <div class="playback-controls">
         <button 
-          @click="togglePlayback" 
-          class="btn-playback"
+          class="btn-playback" 
           :disabled="!replayData"
+          @click="togglePlayback"
         >
           <span class="icon">{{ isPlaying ? '⏸️' : '▶️' }}</span>
         </button>
         
         <button 
-          @click="restart" 
-          class="btn-restart"
+          class="btn-restart" 
           :disabled="!replayData"
+          @click="restart"
         >
           <span class="icon">⏮️</span>
         </button>
 
         <div class="progress-container">
           <input 
-            type="range" 
             v-model="currentTick" 
+            type="range" 
             :min="0" 
             :max="maxTick"
-            @input="seekToTick"
             class="progress-bar"
             :disabled="!replayData"
-          />
+            @input="seekToTick"
+          >
           <div class="time-display">
             <span>{{ formatTime(currentTick) }}</span>
             <span>/</span>
@@ -68,8 +68,8 @@
         <button 
           v-for="speed in [0.5, 1, 1.5, 2, 3]" 
           :key="speed"
-          @click="playbackSpeed = speed"
           :class="['btn-speed', { active: playbackSpeed === speed }]"
+          @click="playbackSpeed = speed"
         >
           {{ speed }}x
         </button>
@@ -85,7 +85,7 @@
           class="player-info"
           :class="{ winner: isWinner(player.id) }"
         >
-          <div class="player-color" :style="{ background: player.color }"></div>
+          <div class="player-color" :style="{ background: player.color }"/>
           <span class="player-name">{{ player.name }}</span>
           <span v-if="player.isAI" class="ai-badge">AI</span>
           <span v-if="isWinner(player.id)" class="winner-badge">👑</span>
@@ -134,13 +134,13 @@ interface ReplayData {
     tick: number;
     playerId: string;
     action: 'move' | 'brake';
-    payload: any;
+    payload: unknown;
     timestamp: number;
   }>;
   events: Array<{
     tick: number;
     type: string;
-    payload: any;
+    payload: unknown;
     timestamp: number;
   }>;
 }
@@ -149,9 +149,9 @@ const props = defineProps<{
   replayData: ReplayData | null;
 }>();
 
-const emit = defineEmits<{
+defineEmits<{
   close: [];
-}>();
+}>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const cellSize = 20; // Size of each grid cell in pixels
@@ -232,8 +232,8 @@ const simulateTick = (tick: number) => {
   eventsForTick.forEach(event => {
     if (event.type === 'positionSnapshot') {
       // Use position snapshot from server (most accurate)
-      const positions = event.payload.positions;
-      Object.entries(positions).forEach(([playerId, data]: [string, any]) => {
+      const positions = event.payload.positions as Record<string, { x: number; y: number; direction: string; trail: string[] }>;
+      Object.entries(positions).forEach(([playerId, data]) => {
         const player = gameState.value.players.get(playerId);
         if (player) {
           player.x = data.x;
