@@ -16,13 +16,13 @@ withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   'update:modelValue': [value: boolean];
   change: [value: boolean];
-}>();
+}>()
 
 const handleChange = (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  emit('update:modelValue', target.checked);
-  emit('change', target.checked);
-};
+  const target = event.target as HTMLInputElement
+  emit('update:modelValue', target.checked)
+  emit('change', target.checked)
+}
 </script>
 
 <template>

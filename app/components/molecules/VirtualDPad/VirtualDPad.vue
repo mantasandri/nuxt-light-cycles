@@ -87,44 +87,44 @@ interface Props {
 
 withDefaults(defineProps<Props>(), {
   isVisible: true,
-});
+})
 
 const emit = defineEmits<{
   direction: [direction: 'up' | 'down' | 'left' | 'right'];
   brake: [braking: boolean];
-}>();
+}>()
 
-const activeDirection = ref<'up' | 'down' | 'left' | 'right' | null>(null);
-const isBraking = ref(false);
+const activeDirection = ref<'up' | 'down' | 'left' | 'right' | null>(null)
+const isBraking = ref(false)
 
 const handleDirectionStart = (direction: 'up' | 'down' | 'left' | 'right') => {
-  activeDirection.value = direction;
-  emit('direction', direction);
+  activeDirection.value = direction
+  emit('direction', direction)
   
   // Haptic feedback if available
   if (navigator.vibrate) {
-    navigator.vibrate(10);
+    navigator.vibrate(10)
   }
-};
+}
 
 const handleDirectionEnd = () => {
-  activeDirection.value = null;
-};
+  activeDirection.value = null
+}
 
 const handleBrakeStart = () => {
-  isBraking.value = true;
-  emit('brake', true);
+  isBraking.value = true
+  emit('brake', true)
   
   // Haptic feedback
   if (navigator.vibrate) {
-    navigator.vibrate(15);
+    navigator.vibrate(15)
   }
-};
+}
 
 const handleBrakeEnd = () => {
-  isBraking.value = false;
-  emit('brake', false);
-};
+  isBraking.value = false
+  emit('brake', false)
+}
 </script>
 
 <style scoped>

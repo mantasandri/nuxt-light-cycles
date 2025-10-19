@@ -8,7 +8,7 @@ interface Props {
 withDefaults(defineProps<Props>(), {
   variant: 'default',
   size: 'md',
-});
+})
 </script>
 
 <template>

@@ -15,74 +15,74 @@ const emit = defineEmits<{
   createLobby: [];
   changeSettings: [];
   openReplays: [];
-}>();
+}>()
 
 defineProps<{
   playerName: string;
-}>();
+}>()
 
-const lobbies = ref<LobbyInfo[]>([]);
-const isLoading = ref(false);
-const autoRefresh = ref(true);
-const refreshInterval = ref<NodeJS.Timeout | null>(null);
+const lobbies = ref<LobbyInfo[]>([])
+const isLoading = ref(false)
+const autoRefresh = ref(true)
+const refreshInterval = ref<NodeJS.Timeout | null>(null)
 
 // Mock function - will be replaced with actual WebSocket call
 const fetchLobbies = async () => {
-  isLoading.value = true;
+  isLoading.value = true
   
   // TODO: Replace with actual WebSocket message to get lobby list
   // For now, we'll emit this through the parent component
   // The parent will handle the WebSocket communication
   
-  isLoading.value = false;
-};
+  isLoading.value = false
+}
 
 const refresh = () => {
-  fetchLobbies();
-};
+  fetchLobbies()
+}
 
 const toggleAutoRefresh = (value: boolean) => {
   if (value) {
-    startAutoRefresh();
+    startAutoRefresh()
   } else {
-    stopAutoRefresh();
+    stopAutoRefresh()
   }
-};
+}
 
 const startAutoRefresh = () => {
   if (refreshInterval.value) {
-    clearInterval(refreshInterval.value);
+    clearInterval(refreshInterval.value)
   }
   
   refreshInterval.value = setInterval(() => {
-    fetchLobbies();
-  }, 3000); // Refresh every 3 seconds
-};
+    fetchLobbies()
+  }, 3000) // Refresh every 3 seconds
+}
 
 const stopAutoRefresh = () => {
   if (refreshInterval.value) {
-    clearInterval(refreshInterval.value);
-    refreshInterval.value = null;
+    clearInterval(refreshInterval.value)
+    refreshInterval.value = null
   }
-};
+}
 
 onMounted(() => {
-  fetchLobbies();
+  fetchLobbies()
   if (autoRefresh.value) {
-    startAutoRefresh();
+    startAutoRefresh()
   }
-});
+})
 
 onUnmounted(() => {
-  stopAutoRefresh();
-});
+  stopAutoRefresh()
+})
 
 // Expose fetchLobbies for parent component
 defineExpose({
   updateLobbies: (newLobbies: LobbyInfo[]) => {
-    lobbies.value = newLobbies;
+    lobbies.value = newLobbies
   }
-});
+})
 </script>
 
 <template>

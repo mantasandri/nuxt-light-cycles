@@ -1,6 +1,6 @@
 // server/machines/game.machine.ts
-import { setup, assign } from 'xstate';
-import type { GamePlayer, PowerUp, GameSettings } from '../types/game.types';
+import { setup, assign } from 'xstate'
+import type { GamePlayer, PowerUp, GameSettings } from '../types/game.types'
 
 // Context: Game state data
 export interface GameContext {
@@ -44,18 +44,18 @@ export const gameMachine = setup({
   },
   guards: {
     hasWinner: ({ context }) => {
-      const activePlayers = context.players.filter(p => p.direction !== 'crashed');
-      return activePlayers.length === 1 && context.players.length > 1;
+      const activePlayers = context.players.filter(p => p.direction !== 'crashed')
+      return activePlayers.length === 1 && context.players.length > 1
     },
     allCrashed: ({ context }) => {
-      return context.players.every(p => p.direction === 'crashed');
+      return context.players.every(p => p.direction === 'crashed')
     },
     shouldEnd: ({ context }) => {
-      const activePlayers = context.players.filter(p => p.direction !== 'crashed');
+      const activePlayers = context.players.filter(p => p.direction !== 'crashed')
       return (
         activePlayers.length === 0 ||
         (activePlayers.length === 1 && context.players.length > 1)
-      );
+      )
     },
   },
   actions: {
@@ -69,7 +69,7 @@ export const gameMachine = setup({
     }),
     updatePlayerDirection: assign({
       players: ({ context, event }) => {
-        if (event.type !== 'PLAYER_MOVE') return context.players;
+        if (event.type !== 'PLAYER_MOVE') return context.players
         
         return context.players.map(p => {
           if (p.id === event.playerId && p.direction !== 'crashed') {
@@ -79,22 +79,22 @@ export const gameMachine = setup({
               (p.direction === 'down' && event.direction === 'up') ||
               (p.direction === 'left' && event.direction === 'right') ||
               (p.direction === 'right' && event.direction === 'left')
-            );
+            )
             
             // Don't allow opposite direction unless no trail
             if (isOpposite && p.trail.length > 0) {
-              return p;
+              return p
             }
             
-            return { ...p, direction: event.direction, lastDirection: event.direction };
+            return { ...p, direction: event.direction, lastDirection: event.direction }
           }
-          return p;
-        });
+          return p
+        })
       },
     }),
     updatePlayerBrake: assign({
       players: ({ context, event }) => {
-        if (event.type !== 'PLAYER_BRAKE') return context.players;
+        if (event.type !== 'PLAYER_BRAKE') return context.players
         
         return context.players.map(p =>
           p.id === event.playerId
@@ -104,43 +104,43 @@ export const gameMachine = setup({
                 brakeStartTime: event.braking ? Date.now() : null,
               }
             : p
-        );
+        )
       },
     }),
     markPlayerCrashed: assign({
       players: ({ context, event }) => {
-        if (event.type !== 'PLAYER_CRASHED') return context.players;
+        if (event.type !== 'PLAYER_CRASHED') return context.players
         
         // Don't mark as crashed if shield absorbed the hit
-        if (event.shieldAbsorbed) return context.players;
+        if (event.shieldAbsorbed) return context.players
         
         return context.players.map(p =>
           p.id === event.playerId ? { ...p, direction: 'crashed' as const } : p
-        );
+        )
       },
     }),
     addPowerUp: assign({
       powerUps: ({ context, event }) => {
-        if (event.type !== 'SPAWN_POWERUP') return context.powerUps;
+        if (event.type !== 'SPAWN_POWERUP') return context.powerUps
         if (context.powerUps.length >= context.settings.maxPowerUps) {
-          return context.powerUps;
+          return context.powerUps
         }
-        return [...context.powerUps, event.powerUp];
+        return [...context.powerUps, event.powerUp]
       },
     }),
     removePowerUp: assign({
       powerUps: ({ context, event }) => {
-        if (event.type !== 'COLLECT_POWERUP') return context.powerUps;
-        return context.powerUps.filter((_, idx) => idx !== event.powerUpIndex);
+        if (event.type !== 'COLLECT_POWERUP') return context.powerUps
+        return context.powerUps.filter((_, idx) => idx !== event.powerUpIndex)
       },
     }),
     applyPowerUpToPlayer: assign({
       players: ({ context, event }) => {
-        if (event.type !== 'COLLECT_POWERUP') return context.players;
+        if (event.type !== 'COLLECT_POWERUP') return context.players
         
         return context.players.map(p => {
           if (p.id === event.playerId) {
-            const now = Date.now();
+            const now = Date.now()
             
             // Apply different power-up effects based on type
             if (event.powerUpType === 'speed') {
@@ -149,34 +149,34 @@ export const gameMachine = setup({
                 return {
                   ...p,
                   speedBoostUntil: p.speedBoostUntil + context.settings.speedBoostDuration,
-                };
+                }
               } else {
                 // New boost
                 return {
                   ...p,
                   speed: 2,
                   speedBoostUntil: now + context.settings.speedBoostDuration,
-                };
+                }
               }
             } else if (event.powerUpType === 'shield') {
               return {
                 ...p,
                 hasShield: true,
-              };
+              }
             } else if (event.powerUpType === 'trailEraser') {
               return {
                 ...p,
                 hasTrailEraser: true,
-              };
+              }
             }
           }
-          return p;
-        });
+          return p
+        })
       },
     }),
     useTrailEraser: assign({
       players: ({ context, event }) => {
-        if (event.type !== 'USE_TRAIL_ERASER') return context.players;
+        if (event.type !== 'USE_TRAIL_ERASER') return context.players
         
         return context.players.map(p => {
           if (p.id === event.playerId && p.hasTrailEraser) {
@@ -185,15 +185,15 @@ export const gameMachine = setup({
               ...p,
               trail: [],
               hasTrailEraser: false,
-            };
+            }
           }
-          return p;
-        });
+          return p
+        })
       },
     }),
     consumeShield: assign({
       players: ({ context, event }) => {
-        if (event.type !== 'PLAYER_CRASHED') return context.players;
+        if (event.type !== 'PLAYER_CRASHED') return context.players
         
         return context.players.map(p => {
           if (p.id === event.playerId && event.shieldAbsorbed) {
@@ -201,16 +201,16 @@ export const gameMachine = setup({
             return {
               ...p,
               hasShield: false,
-            };
+            }
           }
-          return p;
-        });
+          return p
+        })
       },
     }),
     setWinner: assign({
       winner: ({ context }) => {
-        const activePlayers = context.players.filter(p => p.direction !== 'crashed');
-        return activePlayers.length === 1 ? activePlayers[0].id : null;
+        const activePlayers = context.players.filter(p => p.direction !== 'crashed')
+        return activePlayers.length === 1 ? activePlayers[0].id : null
       },
     }),
     resetGame: assign({
@@ -320,5 +320,5 @@ export const gameMachine = setup({
       },
     },
   },
-});
+})
 

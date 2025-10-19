@@ -1,11 +1,11 @@
 <script setup lang="ts">
 const emit = defineEmits<{
   continue: []
-}>();
+}>()
 
 const handleContinue = () => {
-  emit('continue');
-};
+  emit('continue')
+}
 </script>
 
 <template>

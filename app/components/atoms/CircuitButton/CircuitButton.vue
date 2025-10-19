@@ -12,17 +12,17 @@ const props = withDefaults(defineProps<Props>(), {
   size: 'md',
   disabled: false,
   fullWidth: false,
-});
+})
 
 const emit = defineEmits<{
   click: [event: MouseEvent];
-}>();
+}>()
 
 const handleClick = (event: MouseEvent) => {
   if (!props.disabled) {
-    emit('click', event);
+    emit('click', event)
   }
-};
+}
 </script>
 
 <template>

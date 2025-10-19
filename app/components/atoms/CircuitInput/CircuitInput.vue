@@ -16,26 +16,26 @@ const props = withDefaults(defineProps<Props>(), {
   disabled: false,
   error: false,
   fullWidth: true,
-});
+})
 
 const emit = defineEmits<{
   'update:modelValue': [value: string | number];
   enter: [];
   blur: [];
   focus: [];
-}>();
+}>()
 
 const handleInput = (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  const value = props.type === 'number' ? Number(target.value) : target.value;
-  emit('update:modelValue', value);
-};
+  const target = event.target as HTMLInputElement
+  const value = props.type === 'number' ? Number(target.value) : target.value
+  emit('update:modelValue', value)
+}
 
 const handleKeyup = (event: KeyboardEvent) => {
   if (event.key === 'Enter') {
-    emit('enter');
+    emit('enter')
   }
-};
+}
 </script>
 
 <template>

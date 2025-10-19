@@ -29,15 +29,15 @@ const emit = defineEmits<{
   'update:modelValue': [value: string | number | boolean];
   enter?: [];
   change?: [value: string | number];
-}>();
+}>()
 
 const handleUpdate = (value: string | number | boolean) => {
-  emit('update:modelValue', value);
-};
+  emit('update:modelValue', value)
+}
 
 const handleChange = (value: string | number) => {
-  emit('change', value);
-};
+  emit('change', value)
+}
 </script>
 
 <template>

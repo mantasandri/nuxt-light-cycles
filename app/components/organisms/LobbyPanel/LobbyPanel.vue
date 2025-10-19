@@ -29,7 +29,7 @@ const props = defineProps<{
   lobbyState: LobbyState | null;
   currentPlayerId: string | null;
   isReady: boolean;
-}>();
+}>()
 
 const emit = defineEmits<{
   toggleReady: [];
@@ -39,58 +39,58 @@ const emit = defineEmits<{
   banPlayer: [playerId: string];
   addAIBot: [];
   removeAIBot: [botId: string];
-}>();
+}>()
 
 const isHost = computed(() => {
-  return props.currentPlayerId === props.lobbyState?.hostId;
-});
+  return props.currentPlayerId === props.lobbyState?.hostId
+})
 
 const isSpectator = computed(() => {
-  return props.lobbyState?.spectators?.some(s => s.id === props.currentPlayerId) || false;
-});
+  return props.lobbyState?.spectators?.some(s => s.id === props.currentPlayerId) || false
+})
 
 const canStart = computed(() => {
   return props.lobbyState?.players.every(p => p.isReady) && 
-         props.lobbyState?.players.length > 0;
-});
+         props.lobbyState?.players.length > 0
+})
 
 const aiBotsCount = computed(() => {
-  return props.lobbyState?.players.filter(p => p.id.startsWith('ai-')).length || 0;
-});
+  return props.lobbyState?.players.filter(p => p.id.startsWith('ai-')).length || 0
+})
 
 const canAddMoreBots = computed(() => {
-  if (!props.lobbyState) return false;
-  return props.lobbyState.players.length < props.lobbyState.settings.maxPlayers;
-});
+  if (!props.lobbyState) return false
+  return props.lobbyState.players.length < props.lobbyState.settings.maxPlayers
+})
 
 const gridSizeOptions = [
   { value: 30, label: 'Small (30x30)' },
   { value: 40, label: 'Medium (40x40)' },
   { value: 50, label: 'Large (50x50)' },
   { value: 60, label: 'XL (60x60)' },
-];
+]
 
 const maxPlayersOptions = [
   { value: 2, label: '2 Players' },
   { value: 4, label: '4 Players' },
   { value: 6, label: '6 Players' },
   { value: 8, label: '8 Players' },
-];
+]
 
 const updateGridSize = (size: number) => {
-  if (!isHost.value) return;
-  emit('updateSettings', { gridSize: size });
-};
+  if (!isHost.value) return
+  emit('updateSettings', { gridSize: size })
+}
 
 const updateMaxPlayers = (max: number) => {
-  if (!isHost.value) return;
-  emit('updateSettings', { maxPlayers: max });
-};
+  if (!isHost.value) return
+  emit('updateSettings', { maxPlayers: max })
+}
 
 const togglePrivate = (value: boolean) => {
-  if (!isHost.value) return;
-  emit('updateSettings', { isPrivate: value });
-};
+  if (!isHost.value) return
+  emit('updateSettings', { isPrivate: value })
+}
 </script>
 
 <template>

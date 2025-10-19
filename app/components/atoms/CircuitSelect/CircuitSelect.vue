@@ -15,24 +15,24 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   disabled: false,
   fullWidth: true,
-});
+})
 
 const emit = defineEmits<{
   'update:modelValue': [value: string | number];
   change: [value: string | number];
-}>();
+}>()
 
 const handleChange = (event: Event) => {
-  const target = event.target as HTMLSelectElement;
-  const value = target.value;
+  const target = event.target as HTMLSelectElement
+  const value = target.value
   
   // Convert to number if the original option value was a number
-  const option = props.options.find(opt => String(opt.value) === value);
-  const finalValue = option ? option.value : value;
+  const option = props.options.find(opt => String(opt.value) === value)
+  const finalValue = option ? option.value : value
   
-  emit('update:modelValue', finalValue);
-  emit('change', finalValue);
-};
+  emit('update:modelValue', finalValue)
+  emit('change', finalValue)
+}
 </script>
 
 <template>

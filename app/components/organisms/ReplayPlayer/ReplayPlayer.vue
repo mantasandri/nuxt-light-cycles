@@ -147,22 +147,22 @@ interface ReplayData {
 
 const props = defineProps<{
   replayData: ReplayData | null;
-}>();
+}>()
 
 defineEmits<{
   close: [];
 }>()
 
-const canvasRef = ref<HTMLCanvasElement | null>(null);
-const cellSize = 20; // Size of each grid cell in pixels
+const canvasRef = ref<HTMLCanvasElement | null>(null)
+const cellSize = 20 // Size of each grid cell in pixels
 const canvasSize = computed(() => {
-  if (!props.replayData) return 600; // Default fallback
-  return props.replayData.initialState.gridSize * cellSize;
-});
-const isPlaying = ref(false);
-const currentTick = ref(0);
-const playbackSpeed = ref(1);
-const intervalId = ref<number | null>(null);
+  if (!props.replayData) return 600 // Default fallback
+  return props.replayData.initialState.gridSize * cellSize
+})
+const isPlaying = ref(false)
+const currentTick = ref(0)
+const playbackSpeed = ref(1)
+const intervalId = ref<number | null>(null)
 
 // Game state reconstruction
 const gameState = ref<{
@@ -182,32 +182,32 @@ const gameState = ref<{
   players: new Map(),
   powerUps: [],
   obstacles: [],
-});
+})
 
-const maxTick = computed(() => props.replayData?.metadata.totalTicks || 0);
+const maxTick = computed(() => props.replayData?.metadata.totalTicks || 0)
 
 const isWinner = (playerId: string) => {
-  return props.replayData?.metadata.winner?.playerId === playerId;
-};
+  return props.replayData?.metadata.winner?.playerId === playerId
+}
 
 const formatDate = (timestamp: number) => {
-  const date = new Date(timestamp);
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-};
+  const date = new Date(timestamp)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
 
 const formatTime = (tick: number) => {
-  const seconds = Math.floor((tick * (props.replayData?.initialState.settings.tickRate || 200)) / 1000);
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-};
+  const seconds = Math.floor((tick * (props.replayData?.initialState.settings.tickRate || 200)) / 1000)
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
 
 const initializeGameState = () => {
-  if (!props.replayData) return;
+  if (!props.replayData) return
 
-  gameState.value.players.clear();
-  gameState.value.powerUps = [];
-  gameState.value.obstacles = props.replayData.initialState.obstacles;
+  gameState.value.players.clear()
+  gameState.value.powerUps = []
+  gameState.value.obstacles = props.replayData.initialState.obstacles
 
   // Initialize players
   props.replayData.initialState.players.forEach(player => {
@@ -220,237 +220,237 @@ const initializeGameState = () => {
       name: player.name,
       isBraking: false,
       speed: 1,
-    });
-  });
-};
+    })
+  })
+}
 
 const simulateTick = (tick: number) => {
-  if (!props.replayData) return;
+  if (!props.replayData) return
 
   // Apply all events for this tick
-  const eventsForTick = props.replayData.events.filter(e => e.tick === tick);
+  const eventsForTick = props.replayData.events.filter(e => e.tick === tick)
   eventsForTick.forEach(event => {
     if (event.type === 'positionSnapshot') {
       // Use position snapshot from server (most accurate)
-      const positions = event.payload.positions as Record<string, { x: number; y: number; direction: string; trail: string[] }>;
+      const positions = event.payload.positions as Record<string, { x: number; y: number; direction: string; trail: string[] }>
       Object.entries(positions).forEach(([playerId, data]) => {
-        const player = gameState.value.players.get(playerId);
+        const player = gameState.value.players.get(playerId)
         if (player) {
-          player.x = data.x;
-          player.y = data.y;
-          player.direction = data.direction;
-          player.trail = data.trail;
+          player.x = data.x
+          player.y = data.y
+          player.direction = data.direction
+          player.trail = data.trail
         }
-      });
+      })
     } else if (event.type === 'playerCrashed') {
-      const player = gameState.value.players.get(event.payload.playerId);
+      const player = gameState.value.players.get(event.payload.playerId)
       if (player) {
-        player.direction = 'crashed';
+        player.direction = 'crashed'
       }
     } else if (event.type === 'powerUpSpawned') {
-      gameState.value.powerUps.push({ x: event.payload.x, y: event.payload.y, type: event.payload.type || 'speed' });
+      gameState.value.powerUps.push({ x: event.payload.x, y: event.payload.y, type: event.payload.type || 'speed' })
     } else if (event.type === 'powerUpCollected') {
-      const index = event.payload.powerUpIndex;
+      const index = event.payload.powerUpIndex
       if (index >= 0 && index < gameState.value.powerUps.length) {
-        gameState.value.powerUps.splice(index, 1);
+        gameState.value.powerUps.splice(index, 1)
       }
     }
-  });
-};
+  })
+}
 
 const drawGame = () => {
-  if (!canvasRef.value || !props.replayData) return;
+  if (!canvasRef.value || !props.replayData) return
 
-  const canvas = canvasRef.value;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
+  const canvas = canvasRef.value
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
 
-  const gridSize = props.replayData.initialState.gridSize;
-  const size = canvasSize.value; // Get the computed canvas size
+  const gridSize = props.replayData.initialState.gridSize
+  const size = canvasSize.value // Get the computed canvas size
 
   // Clear canvas
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = '#000'
+  ctx.fillRect(0, 0, size, size)
 
   // Draw grid
-  ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)'
+  ctx.lineWidth = 1
   for (let i = 0; i <= gridSize; i++) {
-    ctx.beginPath();
-    ctx.moveTo(i * cellSize, 0);
-    ctx.lineTo(i * cellSize, size);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, i * cellSize);
-    ctx.lineTo(size, i * cellSize);
-    ctx.stroke();
+    ctx.beginPath()
+    ctx.moveTo(i * cellSize, 0)
+    ctx.lineTo(i * cellSize, size)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(0, i * cellSize)
+    ctx.lineTo(size, i * cellSize)
+    ctx.stroke()
   }
 
   // Draw obstacles
-  ctx.fillStyle = '#f44';
+  ctx.fillStyle = '#f44'
   gameState.value.obstacles.forEach(obs => {
-    ctx.fillRect(obs.x * cellSize, obs.y * cellSize, cellSize, cellSize);
-  });
+    ctx.fillRect(obs.x * cellSize, obs.y * cellSize, cellSize, cellSize)
+  })
 
   // Draw power-ups
   gameState.value.powerUps.forEach(powerUp => {
-    const x = powerUp.x * cellSize + cellSize / 2;
-    const y = powerUp.y * cellSize + cellSize / 2;
+    const x = powerUp.x * cellSize + cellSize / 2
+    const y = powerUp.y * cellSize + cellSize / 2
     
     // Different colors for different power-up types
-    let color = '#ff0'; // speed (yellow)
+    let color = '#ff0' // speed (yellow)
     if (powerUp.type === 'shield') {
-      color = '#0cf'; // shield (cyan)
+      color = '#0cf' // shield (cyan)
     } else if (powerUp.type === 'trailEraser') {
-      color = '#f0f'; // trail eraser (magenta)
+      color = '#f0f' // trail eraser (magenta)
     }
     
     // Glow effect
-    const gradient = ctx.createRadialGradient(x, y, 0, x, y, cellSize);
-    const rgb = color === '#ff0' ? '255, 255, 0' : color === '#0cf' ? '0, 204, 255' : '255, 0, 255';
-    gradient.addColorStop(0, `rgba(${rgb}, 0.4)`);
-    gradient.addColorStop(1, `rgba(${rgb}, 0)`);
-    ctx.fillStyle = gradient;
-    ctx.fillRect(powerUp.x * cellSize - cellSize, powerUp.y * cellSize - cellSize, cellSize * 3, cellSize * 3);
+    const gradient = ctx.createRadialGradient(x, y, 0, x, y, cellSize)
+    const rgb = color === '#ff0' ? '255, 255, 0' : color === '#0cf' ? '0, 204, 255' : '255, 0, 255'
+    gradient.addColorStop(0, `rgba(${rgb}, 0.4)`)
+    gradient.addColorStop(1, `rgba(${rgb}, 0)`)
+    ctx.fillStyle = gradient
+    ctx.fillRect(powerUp.x * cellSize - cellSize, powerUp.y * cellSize - cellSize, cellSize * 3, cellSize * 3)
     
     // Power-up circle
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(x, y, cellSize / 3, 0, Math.PI * 2);
-    ctx.fill();
-  });
+    ctx.fillStyle = color
+    ctx.beginPath()
+    ctx.arc(x, y, cellSize / 3, 0, Math.PI * 2)
+    ctx.fill()
+  })
 
   // Draw player trails and players
   gameState.value.players.forEach(player => {
     // Draw trail
-    ctx.strokeStyle = player.color;
-    ctx.lineWidth = cellSize * 0.6;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    ctx.strokeStyle = player.color
+    ctx.lineWidth = cellSize * 0.6
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
 
     if (player.trail.length > 1) {
-      ctx.beginPath();
-      const firstPos = player.trail[0].split(',').map(Number);
-      ctx.moveTo(firstPos[0] * cellSize + cellSize / 2, firstPos[1] * cellSize + cellSize / 2);
+      ctx.beginPath()
+      const firstPos = player.trail[0].split(',').map(Number)
+      ctx.moveTo(firstPos[0] * cellSize + cellSize / 2, firstPos[1] * cellSize + cellSize / 2)
 
       for (let i = 1; i < player.trail.length; i++) {
-        const pos = player.trail[i].split(',').map(Number);
-        ctx.lineTo(pos[0] * cellSize + cellSize / 2, pos[1] * cellSize + cellSize / 2);
+        const pos = player.trail[i].split(',').map(Number)
+        ctx.lineTo(pos[0] * cellSize + cellSize / 2, pos[1] * cellSize + cellSize / 2)
       }
-      ctx.stroke();
+      ctx.stroke()
     }
 
     // Draw player (unless crashed)
     if (player.direction !== 'crashed') {
-      const x = player.x * cellSize + cellSize / 2;
-      const y = player.y * cellSize + cellSize / 2;
+      const x = player.x * cellSize + cellSize / 2
+      const y = player.y * cellSize + cellSize / 2
 
       // Glow effect
-      const gradient = ctx.createRadialGradient(x, y, 0, x, y, cellSize);
-      gradient.addColorStop(0, player.color);
-      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(player.x * cellSize - cellSize, player.y * cellSize - cellSize, cellSize * 3, cellSize * 3);
+      const gradient = ctx.createRadialGradient(x, y, 0, x, y, cellSize)
+      gradient.addColorStop(0, player.color)
+      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
+      ctx.fillStyle = gradient
+      ctx.fillRect(player.x * cellSize - cellSize, player.y * cellSize - cellSize, cellSize * 3, cellSize * 3)
 
       // Player circle
-      ctx.fillStyle = player.color;
-      ctx.beginPath();
-      ctx.arc(x, y, cellSize / 2, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillStyle = player.color
+      ctx.beginPath()
+      ctx.arc(x, y, cellSize / 2, 0, Math.PI * 2)
+      ctx.fill()
 
       // Player name
-      ctx.fillStyle = '#fff';
-      ctx.font = `${cellSize * 0.4}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(player.name, x, y - cellSize);
+      ctx.fillStyle = '#fff'
+      ctx.font = `${cellSize * 0.4}px sans-serif`
+      ctx.textAlign = 'center'
+      ctx.fillText(player.name, x, y - cellSize)
     }
-  });
-};
+  })
+}
 
 const seekToTick = () => {
-  if (!props.replayData) return;
+  if (!props.replayData) return
 
   // Reinitialize and replay up to current tick
-  initializeGameState();
+  initializeGameState()
   
   for (let i = 0; i <= currentTick.value; i++) {
-    simulateTick(i);
+    simulateTick(i)
   }
 
-  drawGame();
-};
+  drawGame()
+}
 
 const togglePlayback = () => {
-  isPlaying.value = !isPlaying.value;
+  isPlaying.value = !isPlaying.value
   
   if (isPlaying.value) {
-    startPlayback();
+    startPlayback()
   } else {
-    stopPlayback();
+    stopPlayback()
   }
-};
+}
 
 const startPlayback = () => {
-  if (!props.replayData) return;
+  if (!props.replayData) return
 
   if (currentTick.value >= maxTick.value) {
-    currentTick.value = 0;
-    initializeGameState();
+    currentTick.value = 0
+    initializeGameState()
   }
 
-  const tickInterval = (props.replayData.initialState.settings.tickRate || 200) / playbackSpeed.value;
+  const tickInterval = (props.replayData.initialState.settings.tickRate || 200) / playbackSpeed.value
 
   intervalId.value = window.setInterval(() => {
     if (currentTick.value >= maxTick.value) {
-      stopPlayback();
-      isPlaying.value = false;
-      return;
+      stopPlayback()
+      isPlaying.value = false
+      return
     }
 
-    currentTick.value++;
-    simulateTick(currentTick.value);
-    drawGame();
-  }, tickInterval);
-};
+    currentTick.value++
+    simulateTick(currentTick.value)
+    drawGame()
+  }, tickInterval)
+}
 
 const stopPlayback = () => {
   if (intervalId.value !== null) {
-    clearInterval(intervalId.value);
-    intervalId.value = null;
+    clearInterval(intervalId.value)
+    intervalId.value = null
   }
-};
+}
 
 const restart = () => {
-  stopPlayback();
-  isPlaying.value = false;
-  currentTick.value = 0;
-  initializeGameState();
-  drawGame();
-};
+  stopPlayback()
+  isPlaying.value = false
+  currentTick.value = 0
+  initializeGameState()
+  drawGame()
+}
 
 watch(() => props.replayData, (newData) => {
   if (newData) {
-    restart();
+    restart()
   }
-});
+})
 
 watch(playbackSpeed, () => {
   if (isPlaying.value) {
-    stopPlayback();
-    startPlayback();
+    stopPlayback()
+    startPlayback()
   }
-});
+})
 
 onMounted(() => {
   if (props.replayData) {
-    initializeGameState();
-    drawGame();
+    initializeGameState()
+    drawGame()
   }
-});
+})
 
 onUnmounted(() => {
-  stopPlayback();
-});
+  stopPlayback()
+})
 </script>
 
 <style scoped>

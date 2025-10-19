@@ -9,17 +9,17 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   size: 'md',
-});
+})
 
 const emit = defineEmits<{
   action: [];
 }>()
 
 const iconSize = computed(() => {
-  if (props.size === 'sm') return '48px';
-  if (props.size === 'lg') return '72px';
-  return '64px';
-});
+  if (props.size === 'sm') return '48px'
+  if (props.size === 'lg') return '72px'
+  return '64px'
+})
 </script>
 
 <template>

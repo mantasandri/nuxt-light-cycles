@@ -62,12 +62,12 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   tickRate: 200,
   speedBoostDuration: 2000,
   maxPowerUps: 5, // Increased from 3 to 5 for more power-ups
-};
+}
 
 export const DEFAULT_LOBBY_SETTINGS: LobbySettings = {
   isPrivate: false,
   gridSize: 40,
   maxPlayers: 8,
   allowSpectators: true,
-};
+}
 

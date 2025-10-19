@@ -26,13 +26,13 @@ const emit = defineEmits<{
   kick: [playerId: string];
   ban: [playerId: string];
   removeBot: [botId: string];
-}>();
+}>()
 
 const sizeMap = {
   sm: { color: 32, name: 14 },
   md: { color: 40, name: 16 },
   lg: { color: 48, name: 18 },
-};
+}
 </script>
 
 <template>

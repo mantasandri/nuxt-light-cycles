@@ -13,33 +13,33 @@ const props = withDefaults(defineProps<Props>(), {
   max: 100,
   step: 1,
   disabled: false,
-});
+})
 
 const emit = defineEmits<{
   'update:modelValue': [value: number];
   change: [value: number];
-}>();
+}>()
 
 const decrement = () => {
-  if (props.disabled) return;
-  const newValue = Math.max(props.min, props.modelValue - props.step);
+  if (props.disabled) return
+  const newValue = Math.max(props.min, props.modelValue - props.step)
   if (newValue !== props.modelValue) {
-    emit('update:modelValue', newValue);
-    emit('change', newValue);
+    emit('update:modelValue', newValue)
+    emit('change', newValue)
   }
-};
+}
 
 const increment = () => {
-  if (props.disabled) return;
-  const newValue = Math.min(props.max, props.modelValue + props.step);
+  if (props.disabled) return
+  const newValue = Math.min(props.max, props.modelValue + props.step)
   if (newValue !== props.modelValue) {
-    emit('update:modelValue', newValue);
-    emit('change', newValue);
+    emit('update:modelValue', newValue)
+    emit('change', newValue)
   }
-};
+}
 
-const isMinReached = computed(() => props.modelValue <= props.min);
-const isMaxReached = computed(() => props.modelValue >= props.max);
+const isMinReached = computed(() => props.modelValue <= props.min)
+const isMaxReached = computed(() => props.modelValue >= props.max)
 </script>
 
 <template>

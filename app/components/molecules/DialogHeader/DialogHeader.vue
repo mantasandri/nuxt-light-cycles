@@ -7,11 +7,11 @@ interface Props {
 
 withDefaults(defineProps<Props>(), {
   showClose: true,
-});
+})
 
 const emit = defineEmits<{
   close: [];
-}>();
+}>()
 </script>
 
 <template>

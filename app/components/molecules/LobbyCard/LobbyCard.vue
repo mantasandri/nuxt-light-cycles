@@ -9,24 +9,24 @@ interface Props {
   state: string;
 }
 
-defineProps<Props>();
+defineProps<Props>()
 
 const emit = defineEmits<{
   join: [lobbyId: string];
   spectate: [lobbyId: string];
-}>();
+}>()
 
 const getStateBadgeVariant = (state: string) => {
-  if (state === 'waiting') return 'warning';
-  if (state === 'inGame') return 'success';
-  return 'default';
-};
+  if (state === 'waiting') return 'warning'
+  if (state === 'inGame') return 'success'
+  return 'default'
+}
 
 const getStateLabel = (state: string) => {
-  if (state === 'waiting') return '⏳ Waiting';
-  if (state === 'inGame') return '🎮 In Game';
-  return state;
-};
+  if (state === 'waiting') return '⏳ Waiting'
+  if (state === 'inGame') return '🎮 In Game'
+  return state
+}
 </script>
 
 <template>

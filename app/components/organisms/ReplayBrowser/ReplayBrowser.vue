@@ -21,109 +21,109 @@ interface Replay {
 
 const props = defineProps<{
   ws: WebSocket | null;
-}>();
+}>()
 
 const emit = defineEmits<{
   watch: [replayId: string];
   close: [];
-}>();
+}>()
 
-const replays = ref<Replay[]>([]);
-const loading = ref(true);
-const deleting = ref<string | null>(null);
+const replays = ref<Replay[]>([])
+const loading = ref(true)
+const deleting = ref<string | null>(null)
 
 const formatDate = (timestamp: number) => {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diff = now.getTime() - date.getTime()
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
   
   if (days === 0) {
-    return `Today at ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+    return `Today at ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
   } else if (days === 1) {
-    return 'Yesterday';
+    return 'Yesterday'
   } else if (days < 7) {
-    return `${days} days ago`;
+    return `${days} days ago`
   } else {
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
-};
+}
 
 const formatDuration = (seconds: number) => {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
-};
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`
+}
 
 const refreshReplays = () => {
   if (!props.ws) {
-    console.error('[ReplayBrowser] No WebSocket connection');
-    return;
+    console.error('[ReplayBrowser] No WebSocket connection')
+    return
   }
   
   if (props.ws.readyState !== WebSocket.OPEN) {
-    console.error('[ReplayBrowser] WebSocket not open, state:', props.ws.readyState);
-    loading.value = false;
-    return;
+    console.error('[ReplayBrowser] WebSocket not open, state:', props.ws.readyState)
+    loading.value = false
+    return
   }
   
-  console.log('[ReplayBrowser] Requesting user replays, WebSocket state:', props.ws.readyState);
-  loading.value = true;
+  console.log('[ReplayBrowser] Requesting user replays, WebSocket state:', props.ws.readyState)
+  loading.value = true
   props.ws.send(JSON.stringify({
     type: 'getUserReplays',
-  }));
-};
+  }))
+}
 
 const deleteReplay = (replayId: string) => {
-  if (!props.ws || deleting.value) return;
+  if (!props.ws || deleting.value) return
   
-  deleting.value = replayId;
+  deleting.value = replayId
   props.ws.send(JSON.stringify({
     type: 'deleteReplay',
     payload: { replayId },
-  }));
-};
+  }))
+}
 
 const handleMessage = (event: MessageEvent) => {
   try {
-    const message = JSON.parse(event.data);
+    const message = JSON.parse(event.data)
     
     // Only handle replay-related messages
     if (message.type === 'userReplays') {
-      console.log('[ReplayBrowser] Received userReplays with', message.payload.replays?.length || 0, 'replays');
-      replays.value = message.payload.replays || [];
-      loading.value = false;
+      console.log('[ReplayBrowser] Received userReplays with', message.payload.replays?.length || 0, 'replays')
+      replays.value = message.payload.replays || []
+      loading.value = false
     } else if (message.type === 'replayDeleted') {
-      console.log('[ReplayBrowser] Replay deleted:', message.payload.replayId);
-      replays.value = replays.value.filter(r => r.replayId !== message.payload.replayId);
-      deleting.value = null;
+      console.log('[ReplayBrowser] Replay deleted:', message.payload.replayId)
+      replays.value = replays.value.filter(r => r.replayId !== message.payload.replayId)
+      deleting.value = null
     } else if (message.type === 'error' && loading.value) {
       // Only handle errors if we're currently loading (might be our error)
-      console.error('[ReplayBrowser] Error from server:', message.payload.message);
-      loading.value = false;
+      console.error('[ReplayBrowser] Error from server:', message.payload.message)
+      loading.value = false
     }
     // Ignore all other message types (they're for the parent component)
   } catch (error) {
-    console.error('[ReplayBrowser] Error parsing message:', error);
+    console.error('[ReplayBrowser] Error parsing message:', error)
   }
-};
+}
 
 onMounted(() => {
-  console.log('[ReplayBrowser] Component mounted, setting up listener');
+  console.log('[ReplayBrowser] Component mounted, setting up listener')
   if (props.ws) {
-    props.ws.addEventListener('message', handleMessage);
-    refreshReplays();
+    props.ws.addEventListener('message', handleMessage)
+    refreshReplays()
   } else {
-    console.error('[ReplayBrowser] No WebSocket connection provided');
+    console.error('[ReplayBrowser] No WebSocket connection provided')
   }
-});
+})
 
 onUnmounted(() => {
-  console.log('[ReplayBrowser] Component unmounting, cleaning up listener');
+  console.log('[ReplayBrowser] Component unmounting, cleaning up listener')
   if (props.ws) {
-    props.ws.removeEventListener('message', handleMessage);
+    props.ws.removeEventListener('message', handleMessage)
   }
-});
+})
 </script>
 
 <template>

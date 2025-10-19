@@ -11,7 +11,7 @@ interface LobbySettings {
 const emit = defineEmits<{
   create: [settings: LobbySettings];
   cancel: [];
-}>();
+}>()
 
 const settings = ref<LobbySettings>({
   isPrivate: false,
@@ -20,25 +20,25 @@ const settings = ref<LobbySettings>({
   allowSpectators: true,
   enableAI: false,
   aiPlayerCount: 1,
-});
+})
 
 const gridSizeOptions = [
   { value: 30, label: 'Small (30x30)' },
   { value: 40, label: 'Medium (40x40)' },
   { value: 50, label: 'Large (50x50)' },
   { value: 60, label: 'Extra Large (60x60)' },
-];
+]
 
 const maxPlayersOptions = [
   { value: 2, label: '2 Players' },
   { value: 4, label: '4 Players' },
   { value: 6, label: '6 Players' },
   { value: 8, label: '8 Players' },
-];
+]
 
 const create = () => {
-  emit('create', settings.value);
-};
+  emit('create', settings.value)
+}
 </script>
 
 <template>

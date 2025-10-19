@@ -17,7 +17,7 @@ const sizeMap = {
   md: '20px',
   lg: '24px',
   xl: '32px',
-};
+}
 </script>
 
 <template>

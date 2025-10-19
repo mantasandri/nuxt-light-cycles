@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
-import { usePlayerSettings, AVATAR_OPTIONS } from '~/composables/usePlayerSettings';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { usePlayerSettings, AVATAR_OPTIONS } from '~/composables/usePlayerSettings'
 // Note: All components are auto-imported by Nuxt
 // LobbyPanel, LobbyBrowser, CreateLobbyDialog, ReplayBrowser, ReplayPlayer, VirtualDPad, WelcomeScreen
 
@@ -69,78 +69,78 @@ interface _LobbyInfo {
 }
 
 // Player settings
-const { settings: playerSettings, isConfigured, loadSettings, saveSettings } = usePlayerSettings();
+const { settings: playerSettings, isConfigured, loadSettings, saveSettings } = usePlayerSettings()
 
 // Game audio
-const { playGameOverSound } = useGameAudio();
+const { playGameOverSound } = useGameAudio()
 
 // UI State
-const showWelcome = ref(false);
-const showNameDialog = ref(false);
-const showBrowser = ref(false);
-const showLobby = ref(false);
-const showCreateDialog = ref(false);
-const showDebug = ref(false);
-const showReplayBrowser = ref(false);
-const showReplayPlayer = ref(false);
-const replayAvailable = ref(false);
-const savingReplay = ref(false);
-const replaySavedMessage = ref<string | null>(null);
+const showWelcome = ref(false)
+const showNameDialog = ref(false)
+const showBrowser = ref(false)
+const showLobby = ref(false)
+const showCreateDialog = ref(false)
+const showDebug = ref(false)
+const showReplayBrowser = ref(false)
+const showReplayPlayer = ref(false)
+const replayAvailable = ref(false)
+const savingReplay = ref(false)
+const replaySavedMessage = ref<string | null>(null)
 
 // WebSocket
-const ws = ref<WebSocket | null>(null);
-const playerId = ref<string | null>(null);
-const lobbyId = ref<string | null>(null);
-const reconnectToken = ref<string | null>(null);
-const isSpectator = ref(false);
-const isReconnecting = ref(false);
-const reconnectAttempts = ref(0);
+const ws = ref<WebSocket | null>(null)
+const playerId = ref<string | null>(null)
+const lobbyId = ref<string | null>(null)
+const reconnectToken = ref<string | null>(null)
+const isSpectator = ref(false)
+const isReconnecting = ref(false)
+const reconnectAttempts = ref(0)
 
 // Game state
-const gamePlayers = ref<Player[]>([]);
-const currentGridSize = ref(20);
-const gameState = ref<'waiting' | 'starting' | 'playing' | 'finished'>('waiting');
-const countdown = ref<number | null>(null);
-const isReady = ref(false);
-const lobbyState = ref<LobbyState | null>(null);
-const crashedPlayers = ref<string[]>([]);
-const winner = ref<{ id: string; color: string } | null>(null);
-const powerUps = ref<PowerUp[]>([]);
-const obstacles = ref<string[]>([]);
+const gamePlayers = ref<Player[]>([])
+const currentGridSize = ref(20)
+const gameState = ref<'waiting' | 'starting' | 'playing' | 'finished'>('waiting')
+const countdown = ref<number | null>(null)
+const isReady = ref(false)
+const lobbyState = ref<LobbyState | null>(null)
+const crashedPlayers = ref<string[]>([])
+const winner = ref<{ id: string; color: string } | null>(null)
+const powerUps = ref<PowerUp[]>([])
+const obstacles = ref<string[]>([])
 
 // Canvas
-const canvasRef = ref<HTMLCanvasElement | null>(null);
-let ctx: CanvasRenderingContext2D | null = null;
-const cellSize = 20;
+const canvasRef = ref<HTMLCanvasElement | null>(null)
+let ctx: CanvasRenderingContext2D | null = null
+const cellSize = 20
 
 // Performance optimizations - canvas caching
-let gridCanvas: HTMLCanvasElement | null = null;
-let gridCtx: CanvasRenderingContext2D | null = null;
-let cachedGridSize = 0;
+let gridCanvas: HTMLCanvasElement | null = null
+let gridCtx: CanvasRenderingContext2D | null = null
+let cachedGridSize = 0
 
 // Current player (for boost status display)
 const currentPlayer = computed(() => {
-  return gamePlayers.value.find(p => p.id === playerId.value);
-});
+  return gamePlayers.value.find(p => p.id === playerId.value)
+})
 
 // Reactive time for boost timers (updates every 100ms when playing)
-const currentTime = ref(Date.now());
-let timeUpdateInterval: NodeJS.Timeout | null = null;
+const currentTime = ref(Date.now())
+let timeUpdateInterval: NodeJS.Timeout | null = null
 
 const hasAnyBoost = computed(() => {
-  const player = currentPlayer.value;
-  if (!player) return false;
+  const player = currentPlayer.value
+  if (!player) return false
   
-  const hasSpeed = player.speedBoostUntil && currentTime.value < player.speedBoostUntil;
-  return hasSpeed || player.hasShield || player.hasTrailEraser;
-});
+  const hasSpeed = player.speedBoostUntil && currentTime.value < player.speedBoostUntil
+  return hasSpeed || player.hasShield || player.hasTrailEraser
+})
 
 // Controls
-const isBraking = ref(false);
-const currentDirection = ref<string>('');
+const isBraking = ref(false)
+const currentDirection = ref<string>('')
 
 // Lobby browser - using component instance type
-const lobbyBrowser = ref<{ updateLobbies: (lobbies: unknown[]) => void } | null>(null);
+const lobbyBrowser = ref<{ updateLobbies: (lobbies: unknown[]) => void } | null>(null)
 
 // Replay system
 interface ReplayData {
@@ -192,13 +192,13 @@ interface ReplayData {
   }>;
 }
 
-const currentReplayData = ref<ReplayData | null>(null);
+const currentReplayData = ref<ReplayData | null>(null)
 
 // Temporary name/color for dialog
-const tempName = ref('');
-const tempColor = ref('hsl(180, 90%, 60%)');
-const tempColorHex = ref('#00ffff');
-const tempAvatar = ref('recognizer');
+const tempName = ref('')
+const tempColor = ref('hsl(180, 90%, 60%)')
+const tempColorHex = ref('#00ffff')
+const tempAvatar = ref('recognizer')
 
 // YouTube player
 interface YouTubePlayer {
@@ -212,278 +212,278 @@ interface YouTubeEvent {
   data: number;
 }
 
-const youtubePlayer = ref<YouTubePlayer | null>(null);
-const isYoutubePlaying = ref(false);
+const youtubePlayer = ref<YouTubePlayer | null>(null)
+const isYoutubePlaying = ref(false)
 
 const hslToHex = (h: number, s: number, l: number) => {
-  l /= 100;
-  const a = s * Math.min(l, 1 - l) / 100;
+  l /= 100
+  const a = s * Math.min(l, 1 - l) / 100
   const f = (n: number) => {
-    const k = (n + h / 30) % 12;
-    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-    return Math.round(255 * color).toString(16).padStart(2, '0');
-  };
-  return `#${f(0)}${f(8)}${f(4)}`;
-};
+    const k = (n + h / 30) % 12
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1)
+    return Math.round(255 * color).toString(16).padStart(2, '0')
+  }
+  return `#${f(0)}${f(8)}${f(4)}`
+}
 
 const hexToHSL = (hex: string) => {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!result) return null;
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  if (!result) return null
   
-  const r = parseInt(result[1] || '0', 16) / 255;
-  const g = parseInt(result[2] || '0', 16) / 255;
-  const b = parseInt(result[3] || '0', 16) / 255;
+  const r = parseInt(result[1] || '0', 16) / 255
+  const g = parseInt(result[2] || '0', 16) / 255
+  const b = parseInt(result[3] || '0', 16) / 255
   
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  let h = 0;
-  let s = 0;
-  const l = (max + min) / 2;
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  let h = 0
+  let s = 0
+  const l = (max + min) / 2
 
   if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    const d = max - min
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
     switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      case b: h = (r - g) / d + 4; break;
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break
+      case g: h = (b - r) / d + 2; break
+      case b: h = (r - g) / d + 4; break
     }
-    h /= 6;
+    h /= 6
   }
 
-  return `hsl(${Math.round(h * 360)}, ${Math.round(s * 100)}%, ${Math.round(l * 100)}%)`;
-};
+  return `hsl(${Math.round(h * 360)}, ${Math.round(s * 100)}%, ${Math.round(l * 100)}%)`
+}
 
 const generateRandomColor = () => {
-  const hue = Math.floor(Math.random() * 360);
-  const saturation = Math.floor(Math.random() * 20) + 80;
-  const lightness = Math.floor(Math.random() * 20) + 50;
-  const hsl = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-  const hex = hslToHex(hue, saturation, lightness);
-  return { hsl, hex };
-};
+  const hue = Math.floor(Math.random() * 360)
+  const saturation = Math.floor(Math.random() * 20) + 80
+  const lightness = Math.floor(Math.random() * 20) + 50
+  const hsl = `hsl(${hue}, ${saturation}%, ${lightness}%)`
+  const hex = hslToHex(hue, saturation, lightness)
+  return { hsl, hex }
+}
 
 const savePlayerSettings = () => {
-  if (!tempName.value.trim()) return;
+  if (!tempName.value.trim()) return
   
   saveSettings({
     name: tempName.value.trim(),
     color: tempColor.value,
     colorHex: tempColorHex.value,
     avatar: tempAvatar.value,
-  });
+  })
   
-  showNameDialog.value = false;
+  showNameDialog.value = false
   
   // Show welcome screen only on first-time setup
-  const hasSeenWelcome = sessionStorage.getItem('hasSeenWelcome');
+  const hasSeenWelcome = sessionStorage.getItem('hasSeenWelcome')
   if (!hasSeenWelcome) {
-    showWelcome.value = true;
+    showWelcome.value = true
   } else {
-    connectWebSocket();
+    connectWebSocket()
   }
-};
+}
 
 const handleWelcomeContinue = () => {
-  showWelcome.value = false;
-  sessionStorage.setItem('hasSeenWelcome', 'true');
-  connectWebSocket();
-};
+  showWelcome.value = false
+  sessionStorage.setItem('hasSeenWelcome', 'true')
+  connectWebSocket()
+}
 
 const changePlayerSettings = () => {
-  showBrowser.value = false;
-  showNameDialog.value = true;
-  tempName.value = playerSettings.value.name || '';
-  tempColor.value = playerSettings.value.color || 'hsl(180, 90%, 60%)';
-  tempColorHex.value = playerSettings.value.colorHex || '#00ffff';
-  tempAvatar.value = playerSettings.value.avatar || 'recognizer';
-};
+  showBrowser.value = false
+  showNameDialog.value = true
+  tempName.value = playerSettings.value.name || ''
+  tempColor.value = playerSettings.value.color || 'hsl(180, 90%, 60%)'
+  tempColorHex.value = playerSettings.value.colorHex || '#00ffff'
+  tempAvatar.value = playerSettings.value.avatar || 'recognizer'
+}
 
 const handleColorSquareClick = () => {
   if (typeof window !== 'undefined') {
-    const input = window.document.querySelector('.hidden-color-input') as HTMLInputElement;
-    input?.click();
+    const input = window.document.querySelector('.hidden-color-input') as HTMLInputElement
+    input?.click()
   }
-};
+}
 
 const connectWebSocket = () => {
   if (ws.value) {
-    ws.value.close();
+    ws.value.close()
   }
 
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//${window.location.host}/_ws`;
-  const socket = new WebSocket(wsUrl);
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const wsUrl = `${protocol}//${window.location.host}/_ws`
+  const socket = new WebSocket(wsUrl)
 
   socket.onopen = () => {
-    console.log('WebSocket connected');
-    ws.value = socket;
+    console.log('WebSocket connected')
+    ws.value = socket
     
     // Try to reconnect if we have a token
     if (reconnectToken.value && isReconnecting.value) {
-      console.log('[Reconnection] Attempting to restore session...');
+      console.log('[Reconnection] Attempting to restore session...')
       socket.send(JSON.stringify({
         type: 'reconnect',
         payload: { reconnectToken: reconnectToken.value },
-      }));
+      }))
     }
-  };
+  }
 
   socket.onmessage = (event) => {
     try {
-      const data = JSON.parse(event.data);
+      const data = JSON.parse(event.data)
       // Uncomment for debugging: console.log('Received:', data.type);
 
       switch (data.type) {
         case 'connected': {
-          playerId.value = data.payload.playerId;
-          reconnectToken.value = data.payload.reconnectToken;
-          isReconnecting.value = false;
-          reconnectAttempts.value = 0;
+          playerId.value = data.payload.playerId
+          reconnectToken.value = data.payload.reconnectToken
+          isReconnecting.value = false
+          reconnectAttempts.value = 0
           
           // Send persistent userId to server immediately after connection
-          const userId = playerSettings.value.userId;
+          const userId = playerSettings.value.userId
           if (userId && socket.readyState === WebSocket.OPEN) {
-            console.log('[UserID] Sending persistent userId to server:', userId);
+            console.log('[UserID] Sending persistent userId to server:', userId)
             socket.send(JSON.stringify({
               type: 'setUserId',
               payload: { userId },
-            }));
+            }))
           }
           
           // Save reconnection token to localStorage
           if (reconnectToken.value) {
-            localStorage.setItem('reconnectToken', reconnectToken.value);
+            localStorage.setItem('reconnectToken', reconnectToken.value)
           }
           
           if (lobbyBrowser.value) {
-            lobbyBrowser.value.updateLobbies(data.payload.lobbies);
+            lobbyBrowser.value.updateLobbies(data.payload.lobbies)
           }
-          showBrowser.value = true;
-          break;
+          showBrowser.value = true
+          break
         }
 
         case 'reconnected': {
-          console.log('[Reconnection] Successfully restored session');
-          playerId.value = data.payload.playerId;
-          lobbyId.value = data.payload.lobbyId;
-          isSpectator.value = data.payload.isSpectator;
-          isReconnecting.value = false;
-          reconnectAttempts.value = 0;
+          console.log('[Reconnection] Successfully restored session')
+          playerId.value = data.payload.playerId
+          lobbyId.value = data.payload.lobbyId
+          isSpectator.value = data.payload.isSpectator
+          isReconnecting.value = false
+          reconnectAttempts.value = 0
           
           // Show appropriate UI based on state
           if (lobbyId.value) {
-            showBrowser.value = false;
-            showLobby.value = true;
+            showBrowser.value = false
+            showLobby.value = true
           } else {
-            showBrowser.value = true;
+            showBrowser.value = true
           }
-          break;
+          break
         }
 
         case 'lobbyList': {
           if (lobbyBrowser.value) {
-            lobbyBrowser.value.updateLobbies(data.payload.lobbies);
+            lobbyBrowser.value.updateLobbies(data.payload.lobbies)
           }
-          break;
+          break
         }
 
         case 'lobbyJoined': {
-          lobbyId.value = data.payload.lobbyId;
-          currentGridSize.value = data.payload.gridSize;
-          isSpectator.value = data.payload.isSpectator || false;
-          showBrowser.value = false;
-          showCreateDialog.value = false;
+          lobbyId.value = data.payload.lobbyId
+          currentGridSize.value = data.payload.gridSize
+          isSpectator.value = data.payload.isSpectator || false
+          showBrowser.value = false
+          showCreateDialog.value = false
           
           if (canvasRef.value) {
-            canvasRef.value.width = currentGridSize.value * cellSize;
-            canvasRef.value.height = currentGridSize.value * cellSize;
+            canvasRef.value.width = currentGridSize.value * cellSize
+            canvasRef.value.height = currentGridSize.value * cellSize
             if (ctx) {
-              ctx.imageSmoothingEnabled = false;
+              ctx.imageSmoothingEnabled = false
             }
           }
-          break;
+          break
         }
 
         case 'lobbyState': {
-          lobbyState.value = data.payload;
+          lobbyState.value = data.payload
           
           if (data.payload.state === 'starting') {
-            gameState.value = 'starting';
-            showLobby.value = true; // Keep lobby visible to show countdown
+            gameState.value = 'starting'
+            showLobby.value = true // Keep lobby visible to show countdown
             
             // Initialize canvas if not already done
             if (canvasRef.value && currentGridSize.value > 0) {
-              canvasRef.value.width = currentGridSize.value * cellSize;
-              canvasRef.value.height = currentGridSize.value * cellSize;
+              canvasRef.value.width = currentGridSize.value * cellSize
+              canvasRef.value.height = currentGridSize.value * cellSize
               if (ctx) {
-                ctx.imageSmoothingEnabled = false;
+                ctx.imageSmoothingEnabled = false
               }
               // Draw empty game board during countdown
-              drawGame();
+              drawGame()
             }
           } else if (data.payload.state === 'inGame') {
-            gameState.value = 'playing';
-            showLobby.value = false;
+            gameState.value = 'playing'
+            showLobby.value = false
             
             // Close any replay overlays when game starts
-            showReplayBrowser.value = false;
-            showReplayPlayer.value = false;
+            showReplayBrowser.value = false
+            showReplayPlayer.value = false
             
             // Start time update interval for boost timers
-            if (timeUpdateInterval) clearInterval(timeUpdateInterval);
+            if (timeUpdateInterval) clearInterval(timeUpdateInterval)
             timeUpdateInterval = setInterval(() => {
-              currentTime.value = Date.now();
-            }, 100);
+              currentTime.value = Date.now()
+            }, 100)
             
             // Make sure canvas is properly sized when game starts
             if (canvasRef.value && currentGridSize.value > 0) {
-              canvasRef.value.width = currentGridSize.value * cellSize;
-              canvasRef.value.height = currentGridSize.value * cellSize;
+              canvasRef.value.width = currentGridSize.value * cellSize
+              canvasRef.value.height = currentGridSize.value * cellSize
               if (ctx) {
-                ctx.imageSmoothingEnabled = false;
+                ctx.imageSmoothingEnabled = false
               }
               
               // Pre-generate grid cache to avoid first-frame delay
-              createGridCache(currentGridSize.value);
+              createGridCache(currentGridSize.value)
               
               // Don't call drawGame() here - wait for first gameState message with player data
             }
           } else if (data.payload.state === 'waiting') {
-            gameState.value = 'waiting';
-            showLobby.value = true;
+            gameState.value = 'waiting'
+            showLobby.value = true
             
             // Stop time update interval when not playing
             if (timeUpdateInterval) {
-              clearInterval(timeUpdateInterval);
-              timeUpdateInterval = null;
+              clearInterval(timeUpdateInterval)
+              timeUpdateInterval = null
             }
           }
           
           // Update ready state
-          const currentPlayerInLobby = data.payload.players.find((p: { id: string }) => p.id === playerId.value);
+          const currentPlayerInLobby = data.payload.players.find((p: { id: string }) => p.id === playerId.value)
           if (currentPlayerInLobby) {
-            isReady.value = currentPlayerInLobby.isReady;
+            isReady.value = currentPlayerInLobby.isReady
           }
-          break;
+          break
         }
 
         case 'gameState': {
-          const state = data.payload;
+          const state = data.payload
           
-          gameState.value = state.gameState;
-          currentGridSize.value = state.gridSize;
-          powerUps.value = state.powerUps;
-          obstacles.value = state.obstacles;
+          gameState.value = state.gameState
+          currentGridSize.value = state.gridSize
+          powerUps.value = state.powerUps
+          obstacles.value = state.obstacles
           
           gamePlayers.value = state.players.map((p: Player) => {
-            const isNewlyCrashed = p.direction === 'crashed' && !crashedPlayers.value.includes(p.id);
+            const isNewlyCrashed = p.direction === 'crashed' && !crashedPlayers.value.includes(p.id)
             if (isNewlyCrashed) {
-              crashedPlayers.value.push(p.id);
+              crashedPlayers.value.push(p.id)
             }
 
             if (p.id === playerId.value) {
-              currentDirection.value = p.direction;
+              currentDirection.value = p.direction
             }
 
             return { 
@@ -491,11 +491,11 @@ const connectWebSocket = () => {
               trail: p.trail || [],
               hasShield: p.hasShield || false,
               hasTrailEraser: p.hasTrailEraser || false,
-            };
-          });
+            }
+          })
 
-          drawGame();
-          break;
+          drawGame()
+          break
         }
 
         case 'gameStateDelta': {
@@ -515,24 +515,24 @@ const connectWebSocket = () => {
               hasTrailEraser: boolean;
             }>;
             powerUps?: PowerUp[];
-          };
+          }
           
           // Update player positions and append trail deltas
           gamePlayers.value = gamePlayers.value.map(player => {
-            const deltaPlayer = delta.players.find(p => p.id === player.id);
-            if (!deltaPlayer) return player;
+            const deltaPlayer = delta.players.find(p => p.id === player.id)
+            if (!deltaPlayer) return player
             
-            const isNewlyCrashed = deltaPlayer.direction === 'crashed' && !crashedPlayers.value.includes(player.id);
+            const isNewlyCrashed = deltaPlayer.direction === 'crashed' && !crashedPlayers.value.includes(player.id)
             if (isNewlyCrashed) {
-              crashedPlayers.value.push(player.id);
+              crashedPlayers.value.push(player.id)
             }
 
             if (player.id === playerId.value) {
-              currentDirection.value = deltaPlayer.direction;
+              currentDirection.value = deltaPlayer.direction
             }
 
             // Append new trail segments to existing trail
-            const updatedTrail = [...player.trail, ...(deltaPlayer.trailDelta || [])];
+            const updatedTrail = [...player.trail, ...(deltaPlayer.trailDelta || [])]
             
             return {
               ...player,
@@ -545,184 +545,184 @@ const connectWebSocket = () => {
               isBraking: deltaPlayer.isBraking,
               hasShield: deltaPlayer.hasShield || false,
               hasTrailEraser: deltaPlayer.hasTrailEraser || false,
-            };
-          });
+            }
+          })
 
           // Update power-ups if included in delta
           if (delta.powerUps) {
-            powerUps.value = delta.powerUps;
+            powerUps.value = delta.powerUps
           }
 
-          drawGame();
-          break;
+          drawGame()
+          break
         }
 
         case 'countdown':
-          countdown.value = data.payload.count;
-          gameState.value = 'starting';
-          showLobby.value = false;
-          drawGame();
-          break;
+          countdown.value = data.payload.count
+          gameState.value = 'starting'
+          showLobby.value = false
+          drawGame()
+          break
 
         case 'playerCrashed': {
-          const crashedPlayerId = data.payload.playerId;
-          const crashedPlayer = gamePlayers.value.find(p => p.id === crashedPlayerId);
+          const crashedPlayerId = data.payload.playerId
+          const crashedPlayer = gamePlayers.value.find(p => p.id === crashedPlayerId)
           if (crashedPlayer) {
-            crashedPlayer.direction = 'crashed';
-            crashedPlayers.value.push(crashedPlayerId);
+            crashedPlayer.direction = 'crashed'
+            crashedPlayers.value.push(crashedPlayerId)
           }
-          drawGame();
-          break;
+          drawGame()
+          break
         }
 
         case 'gameOver':
-          console.log('[Client] Game Over received:', data.payload);
+          console.log('[Client] Game Over received:', data.payload)
           if (data.payload.draw) {
-            winner.value = null;
+            winner.value = null
           } else {
             winner.value = {
               id: data.payload.winner,
               color: data.payload.winnerColor
-            };
+            }
           }
-          gameState.value = 'finished';
-          isReady.value = false;
-          countdown.value = null;
-          showLobby.value = false; // Hide lobby panel so game over screen shows
-          replayAvailable.value = data.payload.replayAvailable || false;
-          console.log('[Client] Game state set to finished');
-          console.log('[Client] Replay available:', replayAvailable.value);
-          console.log('[Client] Is spectator:', isSpectator.value);
-          console.log('[Client] Winner:', winner.value);
+          gameState.value = 'finished'
+          isReady.value = false
+          countdown.value = null
+          showLobby.value = false // Hide lobby panel so game over screen shows
+          replayAvailable.value = data.payload.replayAvailable || false
+          console.log('[Client] Game state set to finished')
+          console.log('[Client] Replay available:', replayAvailable.value)
+          console.log('[Client] Is spectator:', isSpectator.value)
+          console.log('[Client] Winner:', winner.value)
           
           // Play game over sound
-          playGameOverSound();
+          playGameOverSound()
           
-          drawGame();
-          break;
+          drawGame()
+          break
 
         case 'replaySaved':
-          console.log('[Client] Replay saved:', data.payload);
-          savingReplay.value = false;
-          replayAvailable.value = false;
+          console.log('[Client] Replay saved:', data.payload)
+          savingReplay.value = false
+          replayAvailable.value = false
           // Show success message
-          replaySavedMessage.value = data.payload.message || 'Replay saved successfully!';
+          replaySavedMessage.value = data.payload.message || 'Replay saved successfully!'
           // Auto-hide after 3 seconds
           setTimeout(() => {
-            replaySavedMessage.value = null;
-          }, 3000);
-          break;
+            replaySavedMessage.value = null
+          }, 3000)
+          break
 
         case 'replayData':
-          console.log('[Client] Replay data received');
-          currentReplayData.value = data.payload.replay;
-          showReplayBrowser.value = false;
-          showReplayPlayer.value = true;
-          break;
+          console.log('[Client] Replay data received')
+          currentReplayData.value = data.payload.replay
+          showReplayBrowser.value = false
+          showReplayPlayer.value = true
+          break
 
         case 'lobbyClosed': {
-          console.log('[Lobby] Lobby closed:', data.payload.message);
+          console.log('[Lobby] Lobby closed:', data.payload.message)
           
           // Reset state
-          lobbyId.value = null;
-          isSpectator.value = false;
-          lobbyState.value = null;
-          gameState.value = 'waiting';
-          showLobby.value = false;
-          showBrowser.value = true;
+          lobbyId.value = null
+          isSpectator.value = false
+          lobbyState.value = null
+          gameState.value = 'waiting'
+          showLobby.value = false
+          showBrowser.value = true
           
           // Show notification to user
-          alert(data.payload.message || 'Lobby has been closed.');
-          break;
+          alert(data.payload.message || 'Lobby has been closed.')
+          break
         }
 
         case 'kicked': {
-          console.log('[Lobby] You have been kicked:', data.payload.message);
+          console.log('[Lobby] You have been kicked:', data.payload.message)
           
           // Reset state
-          lobbyId.value = null;
-          isSpectator.value = false;
-          lobbyState.value = null;
-          gameState.value = 'waiting';
-          showLobby.value = false;
-          showBrowser.value = true;
-          isReady.value = false;
+          lobbyId.value = null
+          isSpectator.value = false
+          lobbyState.value = null
+          gameState.value = 'waiting'
+          showLobby.value = false
+          showBrowser.value = true
+          isReady.value = false
           
           // Show notification to user
-          alert(data.payload.message || 'You have been kicked from the lobby.');
-          break;
+          alert(data.payload.message || 'You have been kicked from the lobby.')
+          break
         }
 
         case 'banned': {
-          console.log('[Lobby] You have been banned:', data.payload.message);
+          console.log('[Lobby] You have been banned:', data.payload.message)
           
           // Reset state
-          lobbyId.value = null;
-          isSpectator.value = false;
-          lobbyState.value = null;
-          gameState.value = 'waiting';
-          showLobby.value = false;
-          showBrowser.value = true;
-          isReady.value = false;
+          lobbyId.value = null
+          isSpectator.value = false
+          lobbyState.value = null
+          gameState.value = 'waiting'
+          showLobby.value = false
+          showBrowser.value = true
+          isReady.value = false
           
           // Show notification to user
-          alert(data.payload.message || 'You have been banned from the lobby.');
-          break;
+          alert(data.payload.message || 'You have been banned from the lobby.')
+          break
         }
 
         case 'error':
-          console.error('Server error:', data.payload.message);
-          break;
+          console.error('Server error:', data.payload.message)
+          break
       }
     } catch (error) {
-      console.error('Error processing message:', error);
+      console.error('Error processing message:', error)
     }
-  };
+  }
 
   socket.onclose = () => {
-    console.log('WebSocket disconnected');
-    ws.value = null;
+    console.log('WebSocket disconnected')
+    ws.value = null
     
     // Attempt reconnection
     if (reconnectToken.value && reconnectAttempts.value < 5) {
-      isReconnecting.value = true;
-      reconnectAttempts.value++;
-      const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.value - 1), 10000);
-      console.log(`[Reconnection] Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts.value}/5)`);
-      setTimeout(connectWebSocket, delay);
+      isReconnecting.value = true
+      reconnectAttempts.value++
+      const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.value - 1), 10000)
+      console.log(`[Reconnection] Attempting to reconnect in ${delay}ms (attempt ${reconnectAttempts.value}/5)`)
+      setTimeout(connectWebSocket, delay)
     } else {
       // Failed to reconnect or no token, start fresh
-      gameState.value = 'waiting';
-      showBrowser.value = false;
-      lobbyId.value = null;
-      isSpectator.value = false;
-      isReconnecting.value = false;
-      reconnectAttempts.value = 0;
-      setTimeout(connectWebSocket, 3000);
+      gameState.value = 'waiting'
+      showBrowser.value = false
+      lobbyId.value = null
+      isSpectator.value = false
+      isReconnecting.value = false
+      reconnectAttempts.value = 0
+      setTimeout(connectWebSocket, 3000)
     }
-  };
+  }
 
   socket.onerror = (error) => {
-    console.error('WebSocket error:', error);
-  };
-};
+    console.error('WebSocket error:', error)
+  }
+}
 
 // Request lobby list (for future use with manual refresh)
 const _requestLobbyList = () => {
-  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return
   
   ws.value.send(JSON.stringify({
     type: 'getLobbyList',
     payload: {},
-  }));
-};
+  }))
+}
 
 const handleJoinLobby = (targetLobbyId: string) => {
-  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return
   
   // Close replay browser when joining a lobby
-  showReplayBrowser.value = false;
-  showReplayPlayer.value = false;
+  showReplayBrowser.value = false
+  showReplayPlayer.value = false
   
   ws.value.send(JSON.stringify({
     type: 'joinLobby',
@@ -731,15 +731,15 @@ const handleJoinLobby = (targetLobbyId: string) => {
       playerName: playerSettings.value.name,
       playerColor: playerSettings.value.color,
     },
-  }));
-};
+  }))
+}
 
 const handleSpectateGame = (targetLobbyId: string) => {
-  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return
   
   // Close replay browser when spectating
-  showReplayBrowser.value = false;
-  showReplayPlayer.value = false;
+  showReplayBrowser.value = false
+  showReplayPlayer.value = false
   
   ws.value.send(JSON.stringify({
     type: 'joinLobbyAsSpectator',
@@ -748,15 +748,15 @@ const handleSpectateGame = (targetLobbyId: string) => {
       playerName: playerSettings.value.name,
       playerColor: playerSettings.value.color,
     },
-  }));
-};
+  }))
+}
 
 const handleCreateLobby = (settings: LobbySettings) => {
-  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return
   
   // Close replay browser when creating a lobby
-  showReplayBrowser.value = false;
-  showReplayPlayer.value = false;
+  showReplayBrowser.value = false
+  showReplayPlayer.value = false
   
   ws.value.send(JSON.stringify({
     type: 'createLobby',
@@ -765,210 +765,210 @@ const handleCreateLobby = (settings: LobbySettings) => {
       playerName: playerSettings.value.name,
       playerColor: playerSettings.value.color,
     },
-  }));
-};
+  }))
+}
 
 const toggleReady = () => {
-  if (!ws.value || ws.value.readyState !== WebSocket.OPEN || !playerId.value) return;
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN || !playerId.value) return
 
-  const newReadyState = !isReady.value;
-  isReady.value = newReadyState;
+  const newReadyState = !isReady.value
+  isReady.value = newReadyState
   
   ws.value.send(JSON.stringify({
     type: 'ready',
     payload: { ready: newReadyState }
-  }));
-};
+  }))
+}
 
 const updateLobbySettings = (settings: Partial<LobbySettings>) => {
-  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return
 
   ws.value.send(JSON.stringify({
     type: 'updateSettings',
     payload: { settings }
-  }));
-};
+  }))
+}
 
 const kickPlayer = (targetPlayerId: string) => {
-  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return
 
   ws.value.send(JSON.stringify({
     type: 'kickPlayer',
     payload: { targetPlayerId }
-  }));
-};
+  }))
+}
 
 const banPlayer = (targetPlayerId: string) => {
-  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return
 
   ws.value.send(JSON.stringify({
     type: 'banPlayer',
     payload: { targetPlayerId }
-  }));
-};
+  }))
+}
 
 const addAIBot = () => {
-  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return
 
   ws.value.send(JSON.stringify({
     type: 'addAIBot',
     payload: {}
-  }));
-};
+  }))
+}
 
 const removeAIBot = (botId: string) => {
-  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return
 
   ws.value.send(JSON.stringify({
     type: 'removeAIBot',
     payload: { botId }
-  }));
-};
+  }))
+}
 
 const handlePlayAgain = () => {
-  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return
   
   // Reset game state
-  gameState.value = 'waiting';
-  winner.value = null;
-  crashedPlayers.value = [];
-  gamePlayers.value = [];
-  isReady.value = false;
-  countdown.value = null;
+  gameState.value = 'waiting'
+  winner.value = null
+  crashedPlayers.value = []
+  gamePlayers.value = []
+  isReady.value = false
+  countdown.value = null
   
   // Show lobby panel again
-  showLobby.value = true;
+  showLobby.value = true
   
   // Tell server to return lobby to waiting state (will auto-ready AI)
   ws.value.send(JSON.stringify({
     type: 'returnToLobby',
     payload: {}
-  }));
-};
+  }))
+}
 
 const handleSaveReplay = () => {
-  if (!ws.value || ws.value.readyState !== WebSocket.OPEN || !replayAvailable.value) return;
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN || !replayAvailable.value) return
   
-  savingReplay.value = true;
+  savingReplay.value = true
   ws.value.send(JSON.stringify({
     type: 'saveReplay',
-  }));
-};
+  }))
+}
 
 const handleOpenReplayBrowser = () => {
   // Ensure WebSocket connection is established
   if (!ws.value || ws.value.readyState !== WebSocket.OPEN) {
-    console.log('[Replay] No WebSocket connection, establishing one...');
-    connectWebSocket();
+    console.log('[Replay] No WebSocket connection, establishing one...')
+    connectWebSocket()
     // Wait a bit for connection to establish, then open replay browser
     setTimeout(() => {
       if (ws.value && ws.value.readyState === WebSocket.OPEN) {
-        console.log('[Replay] Connection established, opening replay browser');
-        showReplayBrowser.value = true;
+        console.log('[Replay] Connection established, opening replay browser')
+        showReplayBrowser.value = true
         // ReplayBrowser component will request replays on mount
       } else {
-        console.error('[Replay] Failed to establish WebSocket connection');
-        alert('Could not connect to server. Please try again.');
+        console.error('[Replay] Failed to establish WebSocket connection')
+        alert('Could not connect to server. Please try again.')
       }
-    }, 500);
-    return;
+    }, 500)
+    return
   }
   
-  console.log('[Replay] Opening replay browser');
-  showReplayBrowser.value = true;
+  console.log('[Replay] Opening replay browser')
+  showReplayBrowser.value = true
   // ReplayBrowser component will request replays on mount
-};
+}
 
 const handleWatchReplay = (replayId: string) => {
-  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return
   
   ws.value.send(JSON.stringify({
     type: 'loadReplay',
     payload: { replayId },
-  }));
-};
+  }))
+}
 
 const handleCloseReplayBrowser = () => {
-  showReplayBrowser.value = false;
-};
+  showReplayBrowser.value = false
+}
 
 const handleCloseReplayPlayer = () => {
-  showReplayPlayer.value = false;
-  currentReplayData.value = null;
-};
+  showReplayPlayer.value = false
+  currentReplayData.value = null
+}
 
 const handleQuitToLobby = () => {
-  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return
   
   // Send leave lobby message
   ws.value.send(JSON.stringify({
     type: 'leaveLobby',
     payload: {}
-  }));
+  }))
   
   // Reset all state
-  gameState.value = 'waiting';
-  winner.value = null;
-  crashedPlayers.value = [];
-  gamePlayers.value = [];
-  isReady.value = false;
-  countdown.value = null;
-  lobbyId.value = null;
-  lobbyState.value = null;
+  gameState.value = 'waiting'
+  winner.value = null
+  crashedPlayers.value = []
+  gamePlayers.value = []
+  isReady.value = false
+  countdown.value = null
+  lobbyId.value = null
+  lobbyState.value = null
   
   // Show lobby browser
-  showLobby.value = false;
-  showBrowser.value = true;
-};
+  showLobby.value = false
+  showBrowser.value = true
+}
 
 // Handle virtual D-pad direction input (for mobile)
 const handleDPadDirection = (direction: 'up' | 'down' | 'left' | 'right') => {
-  if (gameState.value !== 'playing') return;
+  if (gameState.value !== 'playing') return
 
   const isOpposite = (
     (currentDirection.value === 'up' && direction === 'down') ||
     (currentDirection.value === 'down' && direction === 'up') ||
     (currentDirection.value === 'left' && direction === 'right') ||
     (currentDirection.value === 'right' && direction === 'left')
-  );
+  )
 
   if (isOpposite) {
     // Don't allow opposite direction, but don't brake either
-    return;
+    return
   } else {
-    currentDirection.value = direction;
+    currentDirection.value = direction
     ws.value?.send(JSON.stringify({
       type: 'move',
       payload: { direction }
-    }));
+    }))
   }
-};
+}
 
 // Handle virtual D-pad brake input (for mobile)
 const handleDPadBrake = (braking: boolean) => {
-  if (gameState.value !== 'playing') return;
+  if (gameState.value !== 'playing') return
 
-  isBraking.value = braking;
+  isBraking.value = braking
   ws.value?.send(JSON.stringify({
     type: 'brake',
     payload: { braking }
-  }));
-};
+  }))
+}
 
 const setupKeyboardListeners = () => {
   const handleKeyDown = (e: KeyboardEvent) => {
-    if (gameState.value !== 'playing') return;
+    if (gameState.value !== 'playing') return
 
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-      e.preventDefault();
+      e.preventDefault()
     }
 
-    let newDirection = '';
+    let newDirection = ''
     switch (e.key) {
-      case 'ArrowUp': newDirection = 'up'; break;
-      case 'ArrowDown': newDirection = 'down'; break;
-      case 'ArrowLeft': newDirection = 'left'; break;
-      case 'ArrowRight': newDirection = 'right'; break;
+      case 'ArrowUp': newDirection = 'up'; break
+      case 'ArrowDown': newDirection = 'down'; break
+      case 'ArrowLeft': newDirection = 'left'; break
+      case 'ArrowRight': newDirection = 'right'; break
     }
 
     if (newDirection) {
@@ -977,33 +977,33 @@ const setupKeyboardListeners = () => {
         (currentDirection.value === 'down' && newDirection === 'up') ||
         (currentDirection.value === 'left' && newDirection === 'right') ||
         (currentDirection.value === 'right' && newDirection === 'left')
-      );
+      )
 
       if (isOpposite) {
-        isBraking.value = true;
+        isBraking.value = true
         ws.value?.send(JSON.stringify({
           type: 'brake',
           payload: { braking: true }
-        }));
+        }))
       } else {
-        currentDirection.value = newDirection;
+        currentDirection.value = newDirection
         ws.value?.send(JSON.stringify({
           type: 'move',
           payload: { direction: newDirection }
-        }));
+        }))
       }
     }
-  };
+  }
 
   const handleKeyUp = (e: KeyboardEvent) => {
-    if (gameState.value !== 'playing') return;
+    if (gameState.value !== 'playing') return
 
-    let direction = '';
+    let direction = ''
     switch (e.key) {
-      case 'ArrowUp': direction = 'up'; break;
-      case 'ArrowDown': direction = 'down'; break;
-      case 'ArrowLeft': direction = 'left'; break;
-      case 'ArrowRight': direction = 'right'; break;
+      case 'ArrowUp': direction = 'up'; break
+      case 'ArrowDown': direction = 'down'; break
+      case 'ArrowLeft': direction = 'left'; break
+      case 'ArrowRight': direction = 'right'; break
     }
 
     if (direction && isBraking.value) {
@@ -1012,407 +1012,407 @@ const setupKeyboardListeners = () => {
         (currentDirection.value === 'down' && direction === 'up') ||
         (currentDirection.value === 'left' && direction === 'right') ||
         (currentDirection.value === 'right' && direction === 'left')
-      );
+      )
 
       if (isOpposite) {
-        isBraking.value = false;
+        isBraking.value = false
         ws.value?.send(JSON.stringify({
           type: 'brake',
           payload: { braking: false }
-        }));
-      }
-    }
-  };
-
-  window.addEventListener('keydown', handleKeyDown);
-  window.addEventListener('keyup', handleKeyUp);
-  return () => {
-    window.removeEventListener('keydown', handleKeyDown);
-    window.removeEventListener('keyup', handleKeyUp);
-  };
-};
-
-const getTrailColor = (color: string | undefined) => {
-  if (!color) return '#ffffff66';
-  
-  if (color.startsWith('hsl')) {
-    const matches = color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-    if (matches && matches.length >= 4) {
-      const h = parseInt(matches[1] || '0');
-      const s = parseInt(matches[2] || '0');
-      const l = parseInt(matches[3] || '0');
-      if (!isNaN(h) && !isNaN(s) && !isNaN(l)) {
-        return `hsla(${h}, ${s}%, ${Math.min(l + 20, 90)}%, 0.4)`;
+        }))
       }
     }
   }
-  return `${color}66`;
-};
+
+  window.addEventListener('keydown', handleKeyDown)
+  window.addEventListener('keyup', handleKeyUp)
+  return () => {
+    window.removeEventListener('keydown', handleKeyDown)
+    window.removeEventListener('keyup', handleKeyUp)
+  }
+}
+
+const getTrailColor = (color: string | undefined) => {
+  if (!color) return '#ffffff66'
+  
+  if (color.startsWith('hsl')) {
+    const matches = color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/)
+    if (matches && matches.length >= 4) {
+      const h = parseInt(matches[1] || '0')
+      const s = parseInt(matches[2] || '0')
+      const l = parseInt(matches[3] || '0')
+      if (!isNaN(h) && !isNaN(s) && !isNaN(l)) {
+        return `hsla(${h}, ${s}%, ${Math.min(l + 20, 90)}%, 0.4)`
+      }
+    }
+  }
+  return `${color}66`
+}
 
 // Create or update cached grid canvas
 const createGridCache = (gridSize: number) => {
-  const size = gridSize * cellSize;
+  const size = gridSize * cellSize
   
   // Create offscreen canvas if needed
   if (!gridCanvas) {
-    gridCanvas = document.createElement('canvas');
-    gridCtx = gridCanvas.getContext('2d', { alpha: false });
+    gridCanvas = document.createElement('canvas')
+    gridCtx = gridCanvas.getContext('2d', { alpha: false })
   }
   
-  if (!gridCtx) return;
+  if (!gridCtx) return
   
   // Resize if needed
   if (gridCanvas.width !== size || gridCanvas.height !== size) {
-    gridCanvas.width = size;
-    gridCanvas.height = size;
+    gridCanvas.width = size
+    gridCanvas.height = size
   }
   
   // Draw grid to offscreen canvas
-  gridCtx.fillStyle = '#000';
-  gridCtx.fillRect(0, 0, size, size);
+  gridCtx.fillStyle = '#000'
+  gridCtx.fillRect(0, 0, size, size)
   
-  gridCtx.strokeStyle = '#333';
-  gridCtx.lineWidth = 0.5;
+  gridCtx.strokeStyle = '#333'
+  gridCtx.lineWidth = 0.5
   
   for (let i = 0; i <= gridSize; i++) {
-    const pos = i * cellSize;
-    gridCtx.beginPath();
-    gridCtx.moveTo(pos, 0);
-    gridCtx.lineTo(pos, size);
-    gridCtx.stroke();
+    const pos = i * cellSize
+    gridCtx.beginPath()
+    gridCtx.moveTo(pos, 0)
+    gridCtx.lineTo(pos, size)
+    gridCtx.stroke()
     
-    gridCtx.beginPath();
-    gridCtx.moveTo(0, pos);
-    gridCtx.lineTo(size, pos);
-    gridCtx.stroke();
+    gridCtx.beginPath()
+    gridCtx.moveTo(0, pos)
+    gridCtx.lineTo(size, pos)
+    gridCtx.stroke()
   }
   
-  cachedGridSize = gridSize;
-};
+  cachedGridSize = gridSize
+}
 
 const drawGame = () => {
-  const canvasEl = canvasRef.value;
+  const canvasEl = canvasRef.value
   
   if (!canvasEl) {
-    console.error('[drawGame] No canvas element');
-    return;
+    console.error('[drawGame] No canvas element')
+    return
   }
   
   // ALWAYS get a fresh context - hydration issue workaround
   ctx = canvasEl.getContext('2d', { 
     alpha: false,
     willReadFrequently: false 
-  });
+  })
   if (!ctx) {
-    console.error('[drawGame] Failed to get canvas context');
-    return;
+    console.error('[drawGame] Failed to get canvas context')
+    return
   }
-  ctx.imageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = false
 
   // Only update canvas dimensions if they actually changed
-  const size = currentGridSize.value * cellSize;
+  const size = currentGridSize.value * cellSize
   if (canvasEl.width !== size || canvasEl.height !== size) {
-    canvasEl.width = size;
-    canvasEl.height = size;
+    canvasEl.width = size
+    canvasEl.height = size
     // Re-apply context settings after resize
     if (ctx) {
-      ctx.imageSmoothingEnabled = false;
+      ctx.imageSmoothingEnabled = false
     }
   }
   
   // Draw cached grid background (performance optimization)
   if (gridCanvas && cachedGridSize === currentGridSize.value) {
     // Use cached grid
-    ctx.drawImage(gridCanvas, 0, 0);
+    ctx.drawImage(gridCanvas, 0, 0)
   } else {
     // Cache not ready or size changed - regenerate
     if (cachedGridSize !== currentGridSize.value) {
-      createGridCache(currentGridSize.value);
+      createGridCache(currentGridSize.value)
     }
     if (gridCanvas) {
-      ctx.drawImage(gridCanvas, 0, 0);
+      ctx.drawImage(gridCanvas, 0, 0)
     } else {
       // Extreme fallback
-      ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+      ctx.clearRect(0, 0, canvasEl.width, canvasEl.height)
     }
   }
   
   // Null check for context (safety)
-  if (!ctx) return;
+  if (!ctx) return
 
   // Draw obstacles first (static)
-  ctx.fillStyle = '#444';
+  ctx.fillStyle = '#444'
   obstacles.value.forEach(pos => {
-    const coords = pos.split(',').map(Number);
+    const coords = pos.split(',').map(Number)
     if (coords.length === 2 && !coords.some(isNaN) && coords[0] !== undefined && coords[1] !== undefined) {
-      ctx.fillRect(coords[0] * cellSize, coords[1] * cellSize, cellSize, cellSize);
+      ctx.fillRect(coords[0] * cellSize, coords[1] * cellSize, cellSize, cellSize)
     }
-  });
+  })
 
   // Draw trails using Path2D for better performance
   gamePlayers.value.forEach(player => {
-    if (player.trail.length === 0) return;
+    if (player.trail.length === 0) return
     
-    const trailColor = getTrailColor(player.color);
-    ctx.fillStyle = trailColor;
+    const trailColor = getTrailColor(player.color)
+    ctx.fillStyle = trailColor
     
     // Use Path2D to batch all trail segments
-    const trailPath = new Path2D();
+    const trailPath = new Path2D()
     player.trail.forEach(pos => {
-      const coords = pos.split(',').map(Number);
+      const coords = pos.split(',').map(Number)
       if (coords.length === 2 && !coords.some(isNaN) && coords[0] !== undefined && coords[1] !== undefined) {
-        trailPath.rect(coords[0] * cellSize, coords[1] * cellSize, cellSize, cellSize);
+        trailPath.rect(coords[0] * cellSize, coords[1] * cellSize, cellSize, cellSize)
       }
-    });
+    })
     
     // Single fill operation for entire trail
-    ctx.fill(trailPath);
+    ctx.fill(trailPath)
 
     // Visual effects for player state
     if (player.speedBoostUntil && Date.now() < player.speedBoostUntil) {
-      ctx.shadowColor = '#ffff00';
-      ctx.shadowBlur = 20;
+      ctx.shadowColor = '#ffff00'
+      ctx.shadowBlur = 20
     }
 
     if (player.isBraking && player.brakeStartTime) {
-      const brakeDuration = (Date.now() - player.brakeStartTime) / 1000;
-      const brakeIntensity = Math.min(1, brakeDuration * 0.2);
-      ctx.shadowColor = '#ff0000';
-      ctx.shadowBlur = 15 + (10 * brakeIntensity);
+      const brakeDuration = (Date.now() - player.brakeStartTime) / 1000
+      const brakeIntensity = Math.min(1, brakeDuration * 0.2)
+      ctx.shadowColor = '#ff0000'
+      ctx.shadowBlur = 15 + (10 * brakeIntensity)
     }
     
     if (player.hasShield) {
-      ctx.shadowColor = '#00ccff';
-      ctx.shadowBlur = 25;
+      ctx.shadowColor = '#00ccff'
+      ctx.shadowBlur = 25
     }
     
     if (player.hasTrailEraser) {
-      ctx.shadowColor = '#ff00ff';
-      ctx.shadowBlur = 20;
+      ctx.shadowColor = '#ff00ff'
+      ctx.shadowBlur = 20
     }
 
     if (typeof player.x === 'number' && typeof player.y === 'number' && player.color) {
-      ctx.fillStyle = player.color;
-      ctx.fillRect(player.x * cellSize, player.y * cellSize, cellSize, cellSize);
+      ctx.fillStyle = player.color
+      ctx.fillRect(player.x * cellSize, player.y * cellSize, cellSize, cellSize)
 
       const center = {
         x: player.x * cellSize + cellSize / 2,
         y: player.y * cellSize + cellSize / 2
-      };
+      }
       
-      ctx.fillStyle = '#000';
-      ctx.beginPath();
+      ctx.fillStyle = '#000'
+      ctx.beginPath()
       switch (player.direction) {
         case 'up':
-          ctx.moveTo(center.x, center.y - cellSize / 3);
-          ctx.lineTo(center.x - cellSize / 4, center.y);
-          ctx.lineTo(center.x + cellSize / 4, center.y);
-          break;
+          ctx.moveTo(center.x, center.y - cellSize / 3)
+          ctx.lineTo(center.x - cellSize / 4, center.y)
+          ctx.lineTo(center.x + cellSize / 4, center.y)
+          break
         case 'down':
-          ctx.moveTo(center.x, center.y + cellSize / 3);
-          ctx.lineTo(center.x - cellSize / 4, center.y);
-          ctx.lineTo(center.x + cellSize / 4, center.y);
-          break;
+          ctx.moveTo(center.x, center.y + cellSize / 3)
+          ctx.lineTo(center.x - cellSize / 4, center.y)
+          ctx.lineTo(center.x + cellSize / 4, center.y)
+          break
         case 'left':
-          ctx.moveTo(center.x - cellSize / 3, center.y);
-          ctx.lineTo(center.x, center.y - cellSize / 4);
-          ctx.lineTo(center.x, center.y + cellSize / 4);
-          break;
+          ctx.moveTo(center.x - cellSize / 3, center.y)
+          ctx.lineTo(center.x, center.y - cellSize / 4)
+          ctx.lineTo(center.x, center.y + cellSize / 4)
+          break
         case 'right':
-          ctx.moveTo(center.x + cellSize / 3, center.y);
-          ctx.lineTo(center.x, center.y - cellSize / 4);
-          ctx.lineTo(center.x, center.y + cellSize / 4);
-          break;
+          ctx.moveTo(center.x + cellSize / 3, center.y)
+          ctx.lineTo(center.x, center.y - cellSize / 4)
+          ctx.lineTo(center.x, center.y + cellSize / 4)
+          break
       }
-      ctx.closePath();
-      ctx.fill();
+      ctx.closePath()
+      ctx.fill()
 
-      ctx.shadowBlur = 0;
+      ctx.shadowBlur = 0
 
       if (player.name) {
-        ctx.fillStyle = '#fff';
-        ctx.font = '12px sans-serif';
-        ctx.textAlign = 'center';
-        const nameText = player.name + (player.id === playerId.value ? ' (You)' : '');
+        ctx.fillStyle = '#fff'
+        ctx.font = '12px sans-serif'
+        ctx.textAlign = 'center'
+        const nameText = player.name + (player.id === playerId.value ? ' (You)' : '')
         ctx.fillText(
           nameText,
           player.x * cellSize + cellSize / 2,
           player.y * cellSize - 5
-        );
+        )
         
         // Draw power-up indicators next to name
-        const nameWidth = ctx.measureText(nameText).width;
-        let iconOffset = nameWidth / 2 + 8;
+        const nameWidth = ctx.measureText(nameText).width
+        let iconOffset = nameWidth / 2 + 8
         
         if (player.hasShield) {
-          ctx.fillStyle = '#00ccff';
-          ctx.font = 'bold 10px sans-serif';
-          ctx.fillText('🛡', player.x * cellSize + cellSize / 2 + iconOffset, player.y * cellSize - 5);
-          iconOffset += 12;
+          ctx.fillStyle = '#00ccff'
+          ctx.font = 'bold 10px sans-serif'
+          ctx.fillText('🛡', player.x * cellSize + cellSize / 2 + iconOffset, player.y * cellSize - 5)
+          iconOffset += 12
         }
         
         if (player.hasTrailEraser) {
-          ctx.fillStyle = '#ff00ff';
-          ctx.font = 'bold 10px sans-serif';
-          ctx.fillText('✨', player.x * cellSize + cellSize / 2 + iconOffset, player.y * cellSize - 5);
+          ctx.fillStyle = '#ff00ff'
+          ctx.font = 'bold 10px sans-serif'
+          ctx.fillText('✨', player.x * cellSize + cellSize / 2 + iconOffset, player.y * cellSize - 5)
         }
       }
     }
-  });
+  })
 
   // Draw power-ups
   powerUps.value.forEach(powerUp => {
     if (typeof powerUp.x === 'number' && typeof powerUp.y === 'number') {
-      const x = powerUp.x * cellSize;
-      const y = powerUp.y * cellSize;
-      const centerX = x + cellSize / 2;
-      const centerY = y + cellSize / 2;
+      const x = powerUp.x * cellSize
+      const y = powerUp.y * cellSize
+      const centerX = x + cellSize / 2
+      const centerY = y + cellSize / 2
 
       // Different colors and icons for different power-up types
       if (powerUp.type === 'speed') {
         // Yellow lightning bolt
-        ctx.shadowColor = '#ffff00';
-        ctx.shadowBlur = 15;
-        ctx.fillStyle = '#ffff00';
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, cellSize / 3, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.shadowColor = '#ffff00'
+        ctx.shadowBlur = 15
+        ctx.fillStyle = '#ffff00'
+        ctx.beginPath()
+        ctx.arc(centerX, centerY, cellSize / 3, 0, Math.PI * 2)
+        ctx.fill()
 
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = '#000';
-        ctx.beginPath();
-        ctx.moveTo(centerX, y + cellSize/4);
-        ctx.lineTo(x + cellSize/3, centerY);
-        ctx.lineTo(centerX, centerY);
-        ctx.lineTo(x + cellSize/3, y + 3*cellSize/4);
-        ctx.lineTo(x + 2*cellSize/3, centerY);
-        ctx.lineTo(centerX, centerY);
-        ctx.lineTo(x + 2*cellSize/3, y + cellSize/4);
-        ctx.closePath();
-        ctx.fill();
+        ctx.shadowBlur = 0
+        ctx.fillStyle = '#000'
+        ctx.beginPath()
+        ctx.moveTo(centerX, y + cellSize/4)
+        ctx.lineTo(x + cellSize/3, centerY)
+        ctx.lineTo(centerX, centerY)
+        ctx.lineTo(x + cellSize/3, y + 3*cellSize/4)
+        ctx.lineTo(x + 2*cellSize/3, centerY)
+        ctx.lineTo(centerX, centerY)
+        ctx.lineTo(x + 2*cellSize/3, y + cellSize/4)
+        ctx.closePath()
+        ctx.fill()
       } else if (powerUp.type === 'shield') {
         // Blue shield
-        ctx.shadowColor = '#00ccff';
-        ctx.shadowBlur = 15;
-        ctx.fillStyle = '#00ccff';
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, cellSize / 3, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.shadowColor = '#00ccff'
+        ctx.shadowBlur = 15
+        ctx.fillStyle = '#00ccff'
+        ctx.beginPath()
+        ctx.arc(centerX, centerY, cellSize / 3, 0, Math.PI * 2)
+        ctx.fill()
 
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = '#000';
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
+        ctx.shadowBlur = 0
+        ctx.fillStyle = '#000'
+        ctx.strokeStyle = '#000'
+        ctx.lineWidth = 2
         
         // Shield shape
-        ctx.beginPath();
-        ctx.moveTo(centerX, y + cellSize/4);
-        ctx.lineTo(x + 2*cellSize/3, y + cellSize/3);
-        ctx.lineTo(x + 2*cellSize/3, centerY + cellSize/8);
-        ctx.lineTo(centerX, y + 3*cellSize/4);
-        ctx.lineTo(x + cellSize/3, centerY + cellSize/8);
-        ctx.lineTo(x + cellSize/3, y + cellSize/3);
-        ctx.closePath();
-        ctx.stroke();
+        ctx.beginPath()
+        ctx.moveTo(centerX, y + cellSize/4)
+        ctx.lineTo(x + 2*cellSize/3, y + cellSize/3)
+        ctx.lineTo(x + 2*cellSize/3, centerY + cellSize/8)
+        ctx.lineTo(centerX, y + 3*cellSize/4)
+        ctx.lineTo(x + cellSize/3, centerY + cellSize/8)
+        ctx.lineTo(x + cellSize/3, y + cellSize/3)
+        ctx.closePath()
+        ctx.stroke()
       } else if (powerUp.type === 'trailEraser') {
         // Purple eraser
-        ctx.shadowColor = '#ff00ff';
-        ctx.shadowBlur = 15;
-        ctx.fillStyle = '#ff00ff';
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, cellSize / 3, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.shadowColor = '#ff00ff'
+        ctx.shadowBlur = 15
+        ctx.fillStyle = '#ff00ff'
+        ctx.beginPath()
+        ctx.arc(centerX, centerY, cellSize / 3, 0, Math.PI * 2)
+        ctx.fill()
 
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = '#000';
+        ctx.shadowBlur = 0
+        ctx.fillStyle = '#000'
         
         // Eraser icon (X shape)
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(x + cellSize/3, y + cellSize/3);
-        ctx.lineTo(x + 2*cellSize/3, y + 2*cellSize/3);
-        ctx.moveTo(x + 2*cellSize/3, y + cellSize/3);
-        ctx.lineTo(x + cellSize/3, y + 2*cellSize/3);
-        ctx.stroke();
+        ctx.strokeStyle = '#000'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.moveTo(x + cellSize/3, y + cellSize/3)
+        ctx.lineTo(x + 2*cellSize/3, y + 2*cellSize/3)
+        ctx.moveTo(x + 2*cellSize/3, y + cellSize/3)
+        ctx.lineTo(x + cellSize/3, y + 2*cellSize/3)
+        ctx.stroke()
       }
     }
-  });
+  })
   
   // Request next frame for continuous rendering
   if (gameState.value === 'playing') {
-    requestAnimationFrame(drawGame);
+    requestAnimationFrame(drawGame)
   }
-};
+}
 
 const toggleYoutube = () => {
-  if (!youtubePlayer.value) return;
+  if (!youtubePlayer.value) return
   
   if (isYoutubePlaying.value) {
-    youtubePlayer.value.pauseVideo();
+    youtubePlayer.value.pauseVideo()
   } else {
-    youtubePlayer.value.playVideo();
+    youtubePlayer.value.playVideo()
   }
-};
+}
 
 // Lifecycle hooks - properly separated
-let keyboardCleanup: (() => void) | null = null;
+let keyboardCleanup: (() => void) | null = null
 
 onMounted(() => {
   // Load player settings
-  loadSettings();
+  loadSettings()
   
   if (!isConfigured.value) {
     // Generate random color for first-time users
-    const color = generateRandomColor();
-    tempColor.value = color.hsl;
-    tempColorHex.value = color.hex;
-    showNameDialog.value = true;
+    const color = generateRandomColor()
+    tempColor.value = color.hsl
+    tempColorHex.value = color.hex
+    showNameDialog.value = true
   } else {
     // Use saved settings
-    tempName.value = playerSettings.value.name || '';
-    tempColor.value = playerSettings.value.color || 'hsl(180, 90%, 60%)';
-    tempColorHex.value = playerSettings.value.colorHex || '#00ffff';
+    tempName.value = playerSettings.value.name || ''
+    tempColor.value = playerSettings.value.color || 'hsl(180, 90%, 60%)'
+    tempColorHex.value = playerSettings.value.colorHex || '#00ffff'
     
     // Check if we should show welcome screen (only once per session for returning users)
-    const hasSeenWelcome = sessionStorage.getItem('hasSeenWelcome');
+    const hasSeenWelcome = sessionStorage.getItem('hasSeenWelcome')
     if (!hasSeenWelcome) {
-      showWelcome.value = true;
+      showWelcome.value = true
     } else {
-      connectWebSocket();
+      connectWebSocket()
     }
   }
 
   // Setup keyboard listeners
-  keyboardCleanup = setupKeyboardListeners();
+  keyboardCleanup = setupKeyboardListeners()
 
   // Initialize canvas
   nextTick(() => {
     if (canvasRef.value) {
       // Always set a minimum size
-      const size = currentGridSize.value > 0 ? currentGridSize.value * cellSize : 800;
-      canvasRef.value.width = size;
-      canvasRef.value.height = size;
-      ctx = canvasRef.value.getContext('2d');
+      const size = currentGridSize.value > 0 ? currentGridSize.value * cellSize : 800
+      canvasRef.value.width = size
+      canvasRef.value.height = size
+      ctx = canvasRef.value.getContext('2d')
       if (ctx) {
-        ctx.imageSmoothingEnabled = false;
+        ctx.imageSmoothingEnabled = false
       }
     }
-  });
+  })
 
   // Initialize YouTube
   if (import.meta.client) {
-    const tag = document.createElement('script');
-    tag.src = 'https://www.youtube.com/iframe_api';
-    const firstScriptTag = document.getElementsByTagName('script')[0];
+    const tag = document.createElement('script')
+    tag.src = 'https://www.youtube.com/iframe_api'
+    const firstScriptTag = document.getElementsByTagName('script')[0]
     if (firstScriptTag?.parentNode) {
-      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag)
     }
 
     // Initialize player when API is ready
     (window as { onYouTubeIframeAPIReady?: () => void; YT?: { Player: new (id: string, config: unknown) => YouTubePlayer } }).onYouTubeIframeAPIReady = () => {
-    const YT = (window as { YT?: { Player: new (id: string, config: unknown) => YouTubePlayer } }).YT;
-    if (!YT) return;
+    const YT = (window as { YT?: { Player: new (id: string, config: unknown) => YouTubePlayer } }).YT
+    if (!YT) return
     youtubePlayer.value = new YT.Player('youtubePlayer', {
       videoId: 'TAutddyBrOg',
       playerVars: {
@@ -1430,29 +1430,29 @@ onMounted(() => {
       },
       events: {
         onReady: (event: YouTubeEvent) => {
-          event.target.setVolume(30);
+          event.target.setVolume(30)
         },
         onStateChange: (event: YouTubeEvent) => {
-          isYoutubePlaying.value = event.data === 1;
+          isYoutubePlaying.value = event.data === 1
         }
       }
-    });
-    };
+    })
+    }
   }
-});
+})
 
 onUnmounted(() => {
   if (keyboardCleanup) {
-    keyboardCleanup();
+    keyboardCleanup()
   }
-  ws.value?.close();
+  ws.value?.close()
   if (youtubePlayer.value) {
-    youtubePlayer.value.pauseVideo();
+    youtubePlayer.value.pauseVideo()
   }
   if (timeUpdateInterval) {
-    clearInterval(timeUpdateInterval);
+    clearInterval(timeUpdateInterval)
   }
-});
+})
 </script>
 
 <template>
