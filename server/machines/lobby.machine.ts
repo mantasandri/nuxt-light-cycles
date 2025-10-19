@@ -8,6 +8,7 @@ export interface LobbyContext {
   hostId: string | null;
   players: GamePlayer[];
   spectators: Spectator[];
+  bannedPlayerIds: string[]; // Track banned players
   settings: LobbySettings;
   createdAt: number;
   countdownStartedAt: number | null;
@@ -25,7 +26,11 @@ export type LobbyEvent =
   | { type: 'START_GAME' }
   | { type: 'GAME_ENDED'; winner: string | null }
   | { type: 'RETURN_TO_LOBBY' }
-  | { type: 'CLOSE_LOBBY' };
+  | { type: 'CLOSE_LOBBY' }
+  | { type: 'KICK_PLAYER'; playerId: string }
+  | { type: 'BAN_PLAYER'; playerId: string }
+  | { type: 'ADD_AI_BOT'; bot: GamePlayer }
+  | { type: 'REMOVE_AI_BOT'; botId: string };
 
 // Input for creating a new lobby machine
 export interface LobbyInput {
@@ -63,6 +68,12 @@ export const lobbyMachine = setup({
     },
     isNotFull: ({ context }) => {
       return context.players.length < context.settings.maxPlayers;
+    },
+    isNotBanned: ({ context, event }) => {
+      if (event.type === 'PLAYER_JOIN') {
+        return !context.bannedPlayerIds.includes(event.player.id);
+      }
+      return true;
     },
     isHost: ({ event }) => {
       if (event.type === 'START_GAME' || event.type === 'UPDATE_SETTINGS') {
@@ -165,6 +176,44 @@ export const lobbyMachine = setup({
     resetRound: assign({
       roundNumber: () => 1,
     }),
+    kickPlayer: assign({
+      players: ({ context, event }) => {
+        if (event.type !== 'KICK_PLAYER') return context.players;
+        return context.players.filter(p => p.id !== event.playerId);
+      },
+    }),
+    banPlayer: assign({
+      players: ({ context, event }) => {
+        if (event.type !== 'BAN_PLAYER') return context.players;
+        return context.players.filter(p => p.id !== event.playerId);
+      },
+      bannedPlayerIds: ({ context, event }) => {
+        if (event.type !== 'BAN_PLAYER') return context.bannedPlayerIds;
+        // Add to banned list if not already there
+        if (!context.bannedPlayerIds.includes(event.playerId)) {
+          return [...context.bannedPlayerIds, event.playerId];
+        }
+        return context.bannedPlayerIds;
+      },
+    }),
+    addAIBot: assign({
+      players: ({ context, event }) => {
+        if (event.type !== 'ADD_AI_BOT') return context.players;
+        
+        // Don't add if lobby is full
+        if (context.players.length >= context.settings.maxPlayers) {
+          return context.players;
+        }
+        
+        return [...context.players, event.bot];
+      },
+    }),
+    removeAIBot: assign({
+      players: ({ context, event }) => {
+        if (event.type !== 'REMOVE_AI_BOT') return context.players;
+        return context.players.filter(p => p.id !== event.botId);
+      },
+    }),
   },
 }).createMachine({
   id: 'lobby',
@@ -174,6 +223,7 @@ export const lobbyMachine = setup({
     hostId: input.hostId || null,
     players: [],
     spectators: [],
+    bannedPlayerIds: [],
     settings: {
       isPrivate: input.settings?.isPrivate ?? false,
       gridSize: input.settings?.gridSize ?? 40,
@@ -189,7 +239,7 @@ export const lobbyMachine = setup({
       description: 'Waiting for players to join and ready up',
       on: {
         PLAYER_JOIN: {
-          guard: 'isNotFull',
+          guard: { type: 'isNotFull', and: ['isNotBanned'] },
           actions: 'addPlayer',
         },
         PLAYER_LEAVE: {
@@ -212,6 +262,19 @@ export const lobbyMachine = setup({
         START_GAME: {
           guard: 'allPlayersReady',
           target: 'starting',
+        },
+        KICK_PLAYER: {
+          actions: 'kickPlayer',
+        },
+        BAN_PLAYER: {
+          actions: 'banPlayer',
+        },
+        ADD_AI_BOT: {
+          guard: 'isNotFull',
+          actions: 'addAIBot',
+        },
+        REMOVE_AI_BOT: {
+          actions: 'removeAIBot',
         },
         CLOSE_LOBBY: {
           target: 'closed',

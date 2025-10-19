@@ -120,6 +120,14 @@ export const handleMessage = async (
       return handleBrake(playerId, lobbyId, data, context);
     case 'updateSettings':
       return handleUpdateSettings(playerId, lobbyId, data, context);
+    case 'kickPlayer':
+      return handleKickPlayer(playerId, lobbyId, data, context);
+    case 'banPlayer':
+      return handleBanPlayer(playerId, lobbyId, data, context);
+    case 'addAIBot':
+      return handleAddAIBot(playerId, lobbyId, data, context);
+    case 'removeAIBot':
+      return handleRemoveAIBot(playerId, lobbyId, data, context);
     case 'returnToLobby':
       return handleReturnToLobby(lobbyId, context);
     case 'saveReplay':
@@ -330,6 +338,15 @@ const handleJoinLobby = (
     sendToPeer(playerId, {
       type: 'error',
       payload: { message: 'Lobby not found' },
+    }, context.connectedPeers);
+    return;
+  }
+
+  // Check if player is banned from this lobby
+  if (lobbyService.isPlayerBanned(targetLobbyId, playerId)) {
+    sendToPeer(playerId, {
+      type: 'error',
+      payload: { message: 'You have been banned from this lobby' },
     }, context.connectedPeers);
     return;
   }
@@ -920,5 +937,260 @@ const handleSaveReplay = async (
       payload: { message: 'Failed to save replay' },
     }, context.connectedPeers);
   }
+};
+
+/**
+ * Handle kickPlayer
+ */
+const handleKickPlayer = (
+  playerId: string,
+  lobbyId: string,
+  data: GameMessage,
+  context: MessageHandlerContext
+) => {
+  const lobbyContext = lobbyService.getLobbyContext(lobbyId);
+  if (!lobbyContext) return;
+
+  // Only host can kick players
+  if (lobbyContext.hostId !== playerId) {
+    sendToPeer(playerId, {
+      type: 'error',
+      payload: { message: 'Only the host can kick players' },
+    }, context.connectedPeers);
+    return;
+  }
+
+  const targetPlayerId = data.payload.targetPlayerId;
+  
+  // Can't kick yourself
+  if (targetPlayerId === playerId) {
+    sendToPeer(playerId, {
+      type: 'error',
+      payload: { message: 'You cannot kick yourself' },
+    }, context.connectedPeers);
+    return;
+  }
+
+  // Can't kick AI bots (use removeAIBot instead)
+  if (targetPlayerId.startsWith('ai-')) {
+    sendToPeer(playerId, {
+      type: 'error',
+      payload: { message: 'Use the AI controls to remove bots' },
+    }, context.connectedPeers);
+    return;
+  }
+
+  // Notify the kicked player
+  sendToPeer(targetPlayerId, {
+    type: 'kicked',
+    payload: { message: 'You have been kicked from the lobby' },
+  }, context.connectedPeers);
+
+  // Remove from lobby
+  lobbyService.kickPlayer(lobbyId, targetPlayerId);
+  
+  // Update their peer data
+  const targetPeer = context.connectedPeers.get(targetPlayerId);
+  if (targetPeer) {
+    const targetPeerData = (targetPeer as Peer & { data?: PeerData }).data;
+    if (targetPeerData) {
+      targetPeerData.lobbyId = null;
+      targetPeerData.isSpectator = false;
+    }
+    
+    // Send them back to lobby browser
+    sendToPeer(targetPlayerId, {
+      type: 'connected',
+      payload: {
+        playerId: targetPlayerId,
+        reconnectToken: targetPeerData?.reconnectToken || '',
+        lobbies: getLobbyList(),
+      },
+    }, context.connectedPeers);
+  }
+
+  // Broadcast updated lobby state
+  broadcastLobbyState(lobbyId, context.connectedPeers);
+  broadcastLobbyList(context.connectedPeers);
+};
+
+/**
+ * Handle banPlayer
+ */
+const handleBanPlayer = (
+  playerId: string,
+  lobbyId: string,
+  data: GameMessage,
+  context: MessageHandlerContext
+) => {
+  const lobbyContext = lobbyService.getLobbyContext(lobbyId);
+  if (!lobbyContext) return;
+
+  // Only host can ban players
+  if (lobbyContext.hostId !== playerId) {
+    sendToPeer(playerId, {
+      type: 'error',
+      payload: { message: 'Only the host can ban players' },
+    }, context.connectedPeers);
+    return;
+  }
+
+  const targetPlayerId = data.payload.targetPlayerId;
+  
+  // Can't ban yourself
+  if (targetPlayerId === playerId) {
+    sendToPeer(playerId, {
+      type: 'error',
+      payload: { message: 'You cannot ban yourself' },
+    }, context.connectedPeers);
+    return;
+  }
+
+  // Can't ban AI bots
+  if (targetPlayerId.startsWith('ai-')) {
+    sendToPeer(playerId, {
+      type: 'error',
+      payload: { message: 'AI bots cannot be banned' },
+    }, context.connectedPeers);
+    return;
+  }
+
+  // Notify the banned player
+  sendToPeer(targetPlayerId, {
+    type: 'banned',
+    payload: { message: 'You have been banned from the lobby' },
+  }, context.connectedPeers);
+
+  // Ban and remove from lobby
+  lobbyService.banPlayer(lobbyId, targetPlayerId);
+  
+  // Update their peer data
+  const targetPeer = context.connectedPeers.get(targetPlayerId);
+  if (targetPeer) {
+    const targetPeerData = (targetPeer as Peer & { data?: PeerData }).data;
+    if (targetPeerData) {
+      targetPeerData.lobbyId = null;
+      targetPeerData.isSpectator = false;
+    }
+    
+    // Send them back to lobby browser
+    sendToPeer(targetPlayerId, {
+      type: 'connected',
+      payload: {
+        playerId: targetPlayerId,
+        reconnectToken: targetPeerData?.reconnectToken || '',
+        lobbies: getLobbyList(),
+      },
+    }, context.connectedPeers);
+  }
+
+  // Broadcast updated lobby state
+  broadcastLobbyState(lobbyId, context.connectedPeers);
+  broadcastLobbyList(context.connectedPeers);
+};
+
+/**
+ * Handle addAIBot
+ */
+const handleAddAIBot = (
+  playerId: string,
+  lobbyId: string,
+  data: GameMessage,
+  context: MessageHandlerContext
+) => {
+  const lobbyContext = lobbyService.getLobbyContext(lobbyId);
+  if (!lobbyContext) return;
+
+  // Only host can add AI bots
+  if (lobbyContext.hostId !== playerId) {
+    sendToPeer(playerId, {
+      type: 'error',
+      payload: { message: 'Only the host can add AI bots' },
+    }, context.connectedPeers);
+    return;
+  }
+
+  // Check if lobby is full
+  if (lobbyContext.players.length >= lobbyContext.settings.maxPlayers) {
+    sendToPeer(playerId, {
+      type: 'error',
+      payload: { message: 'Lobby is full' },
+    }, context.connectedPeers);
+    return;
+  }
+
+  // Get safe starting position
+  const pos = getSafePosition(
+    lobbyContext.settings.gridSize,
+    lobbyContext.players,
+    []
+  );
+
+  // Count existing AI bots to get next number
+  const aiCount = lobbyContext.players.filter(p => p.id.startsWith('ai-')).length;
+
+  // Create AI bot
+  const aiBot: GamePlayer = {
+    id: `ai-${Math.random().toString(36).slice(2, 8)}`,
+    name: `AI Bot ${aiCount + 1}`,
+    x: pos.x,
+    y: pos.y,
+    direction: pos.direction,
+    color: `hsl(${Math.floor(Math.random() * 360)}, 90%, 60%)`,
+    trail: [],
+    isReady: true, // AI always ready
+    speed: 1,
+    speedBoostUntil: null,
+    isBraking: false,
+    brakeStartTime: null,
+    gameId: lobbyId,
+    hasShield: false,
+    hasTrailEraser: false,
+  };
+
+  lobbyService.addAIBot(lobbyId, aiBot);
+
+  // Broadcast updated lobby state
+  broadcastLobbyState(lobbyId, context.connectedPeers);
+  broadcastLobbyList(context.connectedPeers);
+};
+
+/**
+ * Handle removeAIBot
+ */
+const handleRemoveAIBot = (
+  playerId: string,
+  lobbyId: string,
+  data: GameMessage,
+  context: MessageHandlerContext
+) => {
+  const lobbyContext = lobbyService.getLobbyContext(lobbyId);
+  if (!lobbyContext) return;
+
+  // Only host can remove AI bots
+  if (lobbyContext.hostId !== playerId) {
+    sendToPeer(playerId, {
+      type: 'error',
+      payload: { message: 'Only the host can remove AI bots' },
+    }, context.connectedPeers);
+    return;
+  }
+
+  const botId = data.payload.botId;
+
+  // Verify it's an AI bot
+  if (!botId.startsWith('ai-')) {
+    sendToPeer(playerId, {
+      type: 'error',
+      payload: { message: 'Can only remove AI bots' },
+    }, context.connectedPeers);
+    return;
+  }
+
+  lobbyService.removeAIBot(lobbyId, botId);
+
+  // Broadcast updated lobby state
+  broadcastLobbyState(lobbyId, context.connectedPeers);
+  broadcastLobbyList(context.connectedPeers);
 };
 

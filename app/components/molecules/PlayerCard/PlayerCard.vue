@@ -9,6 +9,8 @@ interface Props {
   isYou?: boolean;
   isSpectator?: boolean;
   size?: 'sm' | 'md' | 'lg';
+  showHostControls?: boolean; // Show kick/ban buttons for host
+  isAIBot?: boolean; // Is this an AI bot
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -17,7 +19,15 @@ const props = withDefaults(defineProps<Props>(), {
   isYou: false,
   isSpectator: false,
   size: 'md',
+  showHostControls: false,
+  isAIBot: false,
 });
+
+const emit = defineEmits<{
+  kick: [playerId: string];
+  ban: [playerId: string];
+  removeBot: [botId: string];
+}>();
 
 const sizeMap = {
   sm: { color: 32, name: 14 },
@@ -60,6 +70,9 @@ const sizeMap = {
           You
         </span>
         <span v-if="isHost" class="text-sm leading-none">👑</span>
+        <span v-if="isAIBot" class="text-purple-400 text-xs font-semibold bg-purple-400/15 px-1.5 py-0.5 rounded">
+          🤖 AI
+        </span>
       </div>
       
       <div v-if="!isSpectator" class="flex items-center">
@@ -79,6 +92,37 @@ const sizeMap = {
           Waiting...
         </CircuitBadge>
       </div>
+    </div>
+
+    <!-- Host controls (kick/ban buttons) -->
+    <div v-if="showHostControls && !isYou" class="flex gap-1.5 ml-2">
+      <CircuitButton
+        v-if="isAIBot"
+        variant="danger"
+        size="sm"
+        @click="emit('removeBot', playerId)"
+        title="Remove bot"
+      >
+        ❌
+      </CircuitButton>
+      <template v-else>
+        <CircuitButton
+          variant="ghost"
+          size="sm"
+          @click="emit('kick', playerId)"
+          title="Kick player"
+        >
+          👢
+        </CircuitButton>
+        <CircuitButton
+          variant="danger"
+          size="sm"
+          @click="emit('ban', playerId)"
+          title="Ban player"
+        >
+          🚫
+        </CircuitButton>
+      </template>
     </div>
   </div>
 </template>

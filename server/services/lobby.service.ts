@@ -285,6 +285,64 @@ class LobbyService {
 
     return lobby.actor.getSnapshot().matches(state as 'waiting' | 'starting' | 'inGame' | 'finished' | 'closed');
   }
+
+  /**
+   * Kick a player from the lobby
+   */
+  kickPlayer(lobbyId: string, playerId: string): boolean {
+    const lobby = this.lobbies.get(lobbyId);
+    if (!lobby) return false;
+
+    lobby.actor.send({ type: 'KICK_PLAYER', playerId });
+    console.log(`[LobbyService] Player ${playerId} kicked from lobby ${lobbyId}`);
+    return true;
+  }
+
+  /**
+   * Ban a player from the lobby
+   */
+  banPlayer(lobbyId: string, playerId: string): boolean {
+    const lobby = this.lobbies.get(lobbyId);
+    if (!lobby) return false;
+
+    lobby.actor.send({ type: 'BAN_PLAYER', playerId });
+    console.log(`[LobbyService] Player ${playerId} banned from lobby ${lobbyId}`);
+    return true;
+  }
+
+  /**
+   * Add an AI bot to the lobby
+   */
+  addAIBot(lobbyId: string, bot: GamePlayer): boolean {
+    const lobby = this.lobbies.get(lobbyId);
+    if (!lobby) return false;
+
+    lobby.actor.send({ type: 'ADD_AI_BOT', bot });
+    console.log(`[LobbyService] AI bot ${bot.id} added to lobby ${lobbyId}`);
+    return true;
+  }
+
+  /**
+   * Remove an AI bot from the lobby
+   */
+  removeAIBot(lobbyId: string, botId: string): boolean {
+    const lobby = this.lobbies.get(lobbyId);
+    if (!lobby) return false;
+
+    lobby.actor.send({ type: 'REMOVE_AI_BOT', botId });
+    console.log(`[LobbyService] AI bot ${botId} removed from lobby ${lobbyId}`);
+    return true;
+  }
+
+  /**
+   * Check if a player is banned from a lobby
+   */
+  isPlayerBanned(lobbyId: string, playerId: string): boolean {
+    const lobbyContext = this.getLobbyContext(lobbyId);
+    if (!lobbyContext) return false;
+
+    return lobbyContext.bannedPlayerIds.includes(playerId);
+  }
 }
 
 // Export singleton instance

@@ -638,6 +638,40 @@ const connectWebSocket = () => {
           break;
         }
 
+        case 'kicked': {
+          console.log('[Lobby] You have been kicked:', data.payload.message);
+          
+          // Reset state
+          lobbyId.value = null;
+          isSpectator.value = false;
+          lobbyState.value = null;
+          gameState.value = 'waiting';
+          showLobby.value = false;
+          showBrowser.value = true;
+          isReady.value = false;
+          
+          // Show notification to user
+          alert(data.payload.message || 'You have been kicked from the lobby.');
+          break;
+        }
+
+        case 'banned': {
+          console.log('[Lobby] You have been banned:', data.payload.message);
+          
+          // Reset state
+          lobbyId.value = null;
+          isSpectator.value = false;
+          lobbyState.value = null;
+          gameState.value = 'waiting';
+          showLobby.value = false;
+          showBrowser.value = true;
+          isReady.value = false;
+          
+          // Show notification to user
+          alert(data.payload.message || 'You have been banned from the lobby.');
+          break;
+        }
+
         case 'error':
           console.error('Server error:', data.payload.message);
           break;
@@ -754,6 +788,42 @@ const updateLobbySettings = (settings: Partial<LobbySettings>) => {
   ws.value.send(JSON.stringify({
     type: 'updateSettings',
     payload: { settings }
+  }));
+};
+
+const kickPlayer = (targetPlayerId: string) => {
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+
+  ws.value.send(JSON.stringify({
+    type: 'kickPlayer',
+    payload: { targetPlayerId }
+  }));
+};
+
+const banPlayer = (targetPlayerId: string) => {
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+
+  ws.value.send(JSON.stringify({
+    type: 'banPlayer',
+    payload: { targetPlayerId }
+  }));
+};
+
+const addAIBot = () => {
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+
+  ws.value.send(JSON.stringify({
+    type: 'addAIBot',
+    payload: {}
+  }));
+};
+
+const removeAIBot = (botId: string) => {
+  if (!ws.value || ws.value.readyState !== WebSocket.OPEN) return;
+
+  ws.value.send(JSON.stringify({
+    type: 'removeAIBot',
+    payload: { botId }
   }));
 };
 
@@ -1576,6 +1646,10 @@ onUnmounted(() => {
           @toggle-ready="toggleReady"
           @update-settings="updateLobbySettings"
           @leave-lobby="handleQuitToLobby"
+          @kick-player="kickPlayer"
+          @ban-player="banPlayer"
+          @add-a-i-bot="addAIBot"
+          @remove-a-i-bot="removeAIBot"
         />
       </div>
     </div>

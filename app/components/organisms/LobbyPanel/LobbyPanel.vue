@@ -36,6 +36,10 @@ const emit = defineEmits<{
   toggleReady: [];
   updateSettings: [settings: Partial<LobbySettings>];
   leaveLobby: [];
+  kickPlayer: [playerId: string];
+  banPlayer: [playerId: string];
+  addAIBot: [];
+  removeAIBot: [botId: string];
 }>();
 
 const isHost = computed(() => {
@@ -49,6 +53,15 @@ const isSpectator = computed(() => {
 const canStart = computed(() => {
   return props.lobbyState?.players.every(p => p.isReady) && 
          props.lobbyState?.players.length > 0;
+});
+
+const aiBotsCount = computed(() => {
+  return props.lobbyState?.players.filter(p => p.id.startsWith('ai-')).length || 0;
+});
+
+const canAddMoreBots = computed(() => {
+  if (!props.lobbyState) return false;
+  return props.lobbyState.players.length < props.lobbyState.settings.maxPlayers;
 });
 
 const gridSizeOptions = [
@@ -127,6 +140,25 @@ const togglePrivate = (value: boolean) => {
       </div>
     </div>
 
+    <!-- AI Bot Controls (host only) -->
+    <div v-if="isHost && lobbyState.state === 'waiting'" class="mb-5 p-4 bg-purple-400/5 border border-purple-400/20 rounded-lg">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-purple-400 m-0 text-base">🤖 AI Bot Controls</h3>
+        <span class="text-purple-400 text-sm">{{ aiBotsCount }} bot{{ aiBotsCount !== 1 ? 's' : '' }}</span>
+      </div>
+      <CircuitButton
+        variant="primary"
+        size="sm"
+        :disabled="!canAddMoreBots"
+        @click="emit('addAIBot')"
+      >
+        ➕ Add AI Bot
+      </CircuitButton>
+      <p v-if="!canAddMoreBots" class="text-purple-400/60 text-xs mt-2 mb-0">
+        Lobby is full ({{ lobbyState.players.length }}/{{ lobbyState.settings.maxPlayers }})
+      </p>
+    </div>
+
     <!-- Players list -->
     <div class="mb-5">
       <h3 class="text-cyan-400 m-0 mb-4 text-base">👥 Players ({{ lobbyState.players.length }}/{{ lobbyState.settings.maxPlayers }})</h3>
@@ -140,6 +172,11 @@ const togglePrivate = (value: boolean) => {
           :is-ready="player.isReady"
           :is-host="player.id === lobbyState.hostId"
           :is-you="player.id === currentPlayerId"
+          :is-a-i-bot="player.id.startsWith('ai-')"
+          :show-host-controls="isHost && lobbyState.state === 'waiting'"
+          @kick="emit('kickPlayer', $event)"
+          @ban="emit('banPlayer', $event)"
+          @remove-bot="emit('removeAIBot', $event)"
         />
       </div>
     </div>
