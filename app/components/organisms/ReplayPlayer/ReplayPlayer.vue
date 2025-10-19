@@ -96,55 +96,6 @@
 </template>
 
 <script setup lang="ts">
-interface ReplayData {
-  metadata: {
-    replayId: string;
-    lobbyName: string;
-    createdAt: number;
-    duration: number;
-    totalTicks: number;
-    winner: {
-      playerId: string;
-      name: string;
-      color: string;
-    } | null;
-    playerCount: number;
-    gridSize: number;
-  };
-  initialState: {
-    gridSize: number;
-    players: Array<{
-      id: string;
-      name: string;
-      color: string;
-      avatar: string;
-      x: number;
-      y: number;
-      direction: 'up' | 'down' | 'left' | 'right' | 'crashed';
-      isAI: boolean;
-    }>;
-    obstacles: Array<{ x: number; y: number }>;
-    settings: {
-      maxPlayers: number;
-      tickRate: number;
-      maxPowerUps: number;
-    };
-  };
-  actions: Array<{
-    tick: number;
-    playerId: string;
-    action: 'move' | 'brake';
-    payload: unknown;
-    timestamp: number;
-  }>;
-  events: Array<{
-    tick: number;
-    type: string;
-    payload: unknown;
-    timestamp: number;
-  }>;
-}
-
 const props = defineProps<{
   replayData: ReplayData | null;
 }>()

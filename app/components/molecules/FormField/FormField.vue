@@ -1,12 +1,6 @@
 <script setup lang="ts">
-interface Option {
-  value: string | number;
-  label: string;
-}
-
 interface Props {
   label: string;
-  modelValue?: string | number | boolean;
   type?: 'text' | 'number' | 'select';
   options?: Option[];
   placeholder?: string;
@@ -19,25 +13,26 @@ interface Props {
   max?: number;
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   type: 'text',
   disabled: false,
   required: false,
 })
 
+const model = defineModel<string | number | boolean>()
+
 const emit = defineEmits<{
-  'update:modelValue': [value: string | number | boolean];
-  enter?: [];
-  change?: [value: string | number];
+  'enter': [];
+  'change': [value: string | number];
 }>()
 
-const handleUpdate = (value: string | number | boolean) => {
-  emit('update:modelValue', value)
-}
+// Computed for narrower typing to child components
+const inputModel = computed({
+  get: () => model.value as string | number | undefined,
+  set: (val) => { model.value = val }
+})
 
-const handleChange = (value: string | number) => {
-  emit('change', value)
-}
+const inputType = computed(() => props.type === 'select' ? 'text' : props.type)
 </script>
 
 <template>
@@ -48,26 +43,24 @@ const handleChange = (value: string | number) => {
     </label>
     
     <CircuitSelect
-      v-if="type === 'select' && options"
-      :model-value="modelValue"
-      :options="options"
-      :placeholder="placeholder"
-      :disabled="disabled"
-      @update:model-value="handleUpdate"
-      @change="handleChange"
+      v-if="props.type === 'select' && props.options"
+      v-model="inputModel"
+      :options="props.options"
+      :placeholder="props.placeholder"
+      :disabled="props.disabled"
+      @change="(val) => emit('change', val)"
     />
     
     <CircuitInput
       v-else
-      :model-value="modelValue"
-      :type="type"
-      :placeholder="placeholder"
-      :disabled="disabled"
-      :maxlength="maxlength"
-      :min="min"
-      :max="max"
-      :error="!!error"
-      @update:model-value="handleUpdate"
+      v-model="inputModel"
+      :type="inputType"
+      :placeholder="props.placeholder"
+      :disabled="props.disabled"
+      :maxlength="props.maxlength"
+      :min="props.min"
+      :max="props.max"
+      :error="!!props.error"
       @enter="emit('enter')"
     />
     

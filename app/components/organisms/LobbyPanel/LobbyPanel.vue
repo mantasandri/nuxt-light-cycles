@@ -1,30 +1,4 @@
 <script setup lang="ts">
-interface LobbySettings {
-  isPrivate: boolean;
-  gridSize: number;
-  maxPlayers: number;
-  allowSpectators: boolean;
-}
-
-interface LobbyState {
-  lobbyId: string;
-  state: string;
-  players: Array<{
-    id: string;
-    name: string;
-    color: string;
-    isReady: boolean;
-  }>;
-  spectators?: Array<{
-    id: string;
-    name: string;
-    color: string;
-  }>;
-  settings: LobbySettings;
-  hostId: string | null;
-  countdownRemaining: number | null;
-}
-
 const props = defineProps<{
   lobbyState: LobbyState | null;
   currentPlayerId: string | null;
@@ -118,7 +92,7 @@ const togglePrivate = (value: boolean) => {
           label="Grid Size"
           type="select"
           :options="gridSizeOptions"
-          @update:model-value="updateGridSize"
+          @update:model-value="(val) => updateGridSize(val as number)"
         />
 
         <FormField
@@ -126,14 +100,14 @@ const togglePrivate = (value: boolean) => {
           label="Max Players"
           type="select"
           :options="maxPlayersOptions"
-          @update:model-value="updateMaxPlayers"
+          @update:model-value="(val) => updateMaxPlayers(val as number)"
         />
 
         <div class="flex items-center pt-5">
           <CircuitCheckbox
             :model-value="lobbyState.settings.isPrivate"
             label="Private Lobby"
-            @update:model-value="togglePrivate"
+            @update:model-value="(val) => togglePrivate(val as boolean)"
           />
         </div>
       </div>

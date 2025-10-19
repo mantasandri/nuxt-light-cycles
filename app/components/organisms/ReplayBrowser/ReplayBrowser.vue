@@ -1,24 +1,4 @@
 <script setup lang="ts">
-interface ReplayMetadata {
-  replayId: string;
-  lobbyName: string;
-  createdAt: number;
-  duration: number;
-  totalTicks: number;
-  winner: {
-    playerId: string;
-    name: string;
-    color: string;
-  } | null;
-  playerCount: number;
-  gridSize: number;
-}
-
-interface Replay {
-  replayId: string;
-  metadata: ReplayMetadata;
-}
-
 const props = defineProps<{
   ws: WebSocket | null;
 }>()

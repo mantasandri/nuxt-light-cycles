@@ -1,14 +1,4 @@
 <script setup lang="ts">
-interface LobbyInfo {
-  lobbyId: string;
-  playerCount: number;
-  maxPlayers: number;
-  gridSize: number;
-  isPrivate: boolean;
-  hostName: string;
-  state: string;
-}
-
 const emit = defineEmits<{
   joinLobby: [lobbyId: string];
   spectateGame: [lobbyId: string];
@@ -41,13 +31,14 @@ const refresh = () => {
   fetchLobbies()
 }
 
-const toggleAutoRefresh = (value: boolean) => {
+// Watch autoRefresh and toggle accordingly
+watch(autoRefresh, (value) => {
   if (value) {
     startAutoRefresh()
   } else {
     stopAutoRefresh()
   }
-}
+})
 
 const startAutoRefresh = () => {
   if (refreshInterval.value) {
@@ -123,7 +114,6 @@ defineExpose({
         v-model="autoRefresh"
         variant="inline"
         label="Auto-refresh"
-        @update:model-value="toggleAutoRefresh"
       />
 
       <div class="flex-1 min-w-[20px] max-md:hidden" />

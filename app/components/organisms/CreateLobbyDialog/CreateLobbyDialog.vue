@@ -1,13 +1,4 @@
 <script setup lang="ts">
-interface LobbySettings {
-  isPrivate: boolean;
-  gridSize: number;
-  maxPlayers: number;
-  allowSpectators: boolean;
-  enableAI: boolean;
-  aiPlayerCount: number;
-}
-
 const emit = defineEmits<{
   create: [settings: LobbySettings];
   cancel: [];

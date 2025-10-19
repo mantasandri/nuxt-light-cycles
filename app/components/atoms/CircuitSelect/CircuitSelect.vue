@@ -1,9 +1,4 @@
 <script setup lang="ts">
-interface Option {
-  value: string | number;
-  label: string;
-}
-
 interface Props {
   modelValue?: string | number;
   options: Option[];
