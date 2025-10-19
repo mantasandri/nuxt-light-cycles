@@ -55,11 +55,17 @@ Light Cycles is a competitive grid-based game where players control light cycles
 
 **WebSocket Handler** (`server/routes/_ws.ts`)
 - Real-time bidirectional communication
+- **Automatic reconnection system**:
+  - 60-second session window for seamless reconnection
+  - Exponential backoff retry strategy (up to 5 attempts)
+  - State restoration (lobby position, spectator status, game progress)
+  - Reconnection tokens for secure session recovery
 - Message types:
   - `createLobby`: Create new game lobby
   - `joinLobby`: Join existing lobby
   - `leaveLobby`: Leave current lobby
   - `ready`: Mark player as ready
+  - `reconnect`: Reconnect with session token
   - `getLobbyState`: Request current lobby state
   - `getLobbyList`: Request list of all lobbies
   - `move`: Send player movement input
@@ -149,6 +155,12 @@ For detailed component documentation, see `app/components/COMPONENT_STRUCTURE.md
 - Color picker with hex/HSL support
 - Generates unique `userId` on first visit (using nanoid)
 
+**useGameAudio** (`app/composables/useGameAudio.ts`)
+- Manages game audio effects
+- Plays "End of Line" sound on game over
+- Volume control and error handling
+- Configurable audio playback
+
 ## 🎨 Player Customization
 
 ### Avatars (Tron-Themed SVG Icons)
@@ -207,7 +219,7 @@ Mechanics:
 - Strategic use can turn the tide of battle
 
 ### Game Settings
-- **Grid Size**: 30x30 (Small), 40x40 (Medium), 50x50 (Large)
+- **Grid Size**: 30x30 (Small), 40x40 (Medium), 50x50 (Large), 60x60 (Extra Large)
 - **Max Players**: 2-8 players per lobby
 - **AI Players**: Toggle AI opponents individually
 
@@ -542,7 +554,7 @@ The replay system records every player action and game event during gameplay, al
 ### Game Settings (Customizable per lobby)
 ```typescript
 interface GameSettings {
-  gridSize: number;        // 30, 40, or 50
+  gridSize: number;        // 30, 40, 50, or 60
   maxPlayers: number;      // 2-8
   tickRate: number;        // 200ms (5 tps)
   maxPowerUps: number;     // 5
@@ -563,7 +575,8 @@ interface GameSettings {
 
 ## 🐛 Known Limitations
 
-1. **Audio**: No sound effects (yet!)
+1. **Audio**: Limited sound effects (currently only game over sound)
+2. **Mobile**: Touch controls may need further optimization for some devices
 
 ## 🎯 Future Enhancements
 
@@ -574,9 +587,11 @@ interface GameSettings {
 - [x] Atomic Design component architecture ✅ **Completed**
 - [x] Tailwind CSS integration ✅ **Completed**
 - [x] Welcome/onboarding screen ✅ **Completed**
+- [x] Audio system (game over sound) ✅ **Completed**
 - [ ] Teleport power-up
 - [ ] Custom game modes (time limit, elimination rounds)
-- [ ] Sound effects and background music
+- [ ] Additional sound effects (movement, collisions, power-ups)
+- [ ] Background music with volume controls
 - [ ] Chat system
 - [ ] Friend system and private lobbies
 - [ ] Customizable grid obstacles
@@ -624,8 +639,8 @@ This project is open source and available for educational purposes.
 Inspired by the classic Tron light cycles game and built with modern web technologies.
 
 **Built with:**
-- Nuxt 3 (Vue 3 Framework)
-- XState (State Machines)
+- Nuxt 4 (Vue 3 Framework)
+- XState v5 (State Machines)
 - TypeScript (Type Safety)
 - Tailwind CSS (Styling)
 - Canvas API (Game Rendering)
@@ -633,30 +648,22 @@ Inspired by the classic Tron light cycles game and built with modern web technol
 
 ---
 
-**Version**: 2.0.0  
+**Version**: 2.1.0  
 **Last Updated**: October 2025
 
-## 📝 Recent Major Updates (v2.0.0)
+## 📝 Recent Major Updates
 
-### Component Architecture Overhaul
-- Migrated to Atomic Design pattern (atoms/molecules/organisms)
-- Created 19 reusable components (6 atoms, 7 molecules, 6 organisms)
-- Achieved 43% code reduction across all components
-- Added `COMPONENT_STRUCTURE.md` for comprehensive documentation
+### v2.1.0 (Latest)
+- **Framework Upgrade**: Migrated to Nuxt 4 with latest XState v5
+- **Audio System**: Added game audio composable with "End of Line" game over sound
+- **Expanded Grid Options**: Added 60x60 (Extra Large) grid size
+- **Enhanced Documentation**: Updated technical specifications and feature lists
 
-### Styling Improvements
-- Integrated Tailwind CSS for consistent styling
-- Custom Tron-themed color palette
-- Improved responsive design
-- Better mobile experience
-
-### New Features
-- **Welcome Screen**: Onboarding for new players
-- **Shield Power-up**: Pass through obstacles and trails once
-- **Trail Eraser Power-up**: Clear portions of your trail
+### v2.0.0
+- **Component Architecture Overhaul**: Migrated to Atomic Design pattern
+- **Created 19 reusable components** (6 atoms, 7 molecules, 6 organisms)
+- **Achieved 43% code reduction** across all components
+- **Styling Improvements**: Integrated Tailwind CSS with custom Tron theme
+- **New Features**: Welcome Screen, Shield power-up, Trail Eraser power-up
 - **Increased Player Capacity**: Support for up to 8 players per lobby
-
-### Performance Optimization
-- Adjusted tick rate to 200ms (5 tps) for better balance
-- Optimized component rendering
-- Improved mobile controls with VirtualDPad
+- **Performance Optimization**: Adjusted tick rate to 200ms (5 tps) for better balance

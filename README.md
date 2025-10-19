@@ -6,13 +6,15 @@ A real-time multiplayer grid battle game inspired by Tron's light cycles. Player
 
 ## 🎮 Features
 
-- **Real-Time Multiplayer**: Up to 4 players per lobby with WebSocket-powered instant updates
-- **State Machine Architecture**: Lobby and game logic powered by XState for predictable state transitions
+- **Real-Time Multiplayer**: Up to 8 players per lobby with WebSocket-powered instant updates
+- **State Machine Architecture**: Lobby and game logic powered by XState v5 for predictable state transitions
 - **AI Opponents**: Smart AI bots that use pathfinding and obstacle avoidance
 - **Spectator Mode**: Watch ongoing matches without participating
 - **Replay System**: Record and playback complete games with full position history
+- **Automatic Reconnection**: Seamless session recovery if connection drops (60-second window)
 - **Responsive Design**: Works on desktop, tablet, and mobile with virtual D-pad controls
-- **Power-ups**: Speed boosts and other collectibles to gain an edge
+- **Power-ups**: Speed boosts, shields, and trail erasers to gain tactical advantages
+- **Audio Effects**: Game over sound effects with "End of Line" theme
 
 ## 🏗️ Technical Highlights
 
@@ -25,7 +27,7 @@ A real-time multiplayer grid battle game inspired by Tron's light cycles. Player
 - Custom WebSocket route (`/server/routes/_ws.ts`) using Nitro's WebSocket support
 - Game tick system running at 200ms intervals
 - Efficient state synchronization between server and clients
-- Reconnection handling with session recovery
+- **Automatic reconnection**: 60-second session recovery with exponential backoff (up to 5 attempts)
 
 ### Replay System
 - Complete position snapshots recorded every tick for perfect accuracy
@@ -36,10 +38,10 @@ A real-time multiplayer grid battle game inspired by Tron's light cycles. Player
 ### Architecture
 ```
 ├── app/                    # Client-side Vue components
-│   ├── components/        # UI components (Lobby, Game, Replays)
-│   └── composables/       # Player settings management
+│   ├── components/        # Atomic Design UI (atoms/molecules/organisms)
+│   └── composables/       # Player settings & audio management
 ├── server/
-│   ├── machines/          # XState state machine definitions
+│   ├── machines/          # XState v5 state machine definitions
 │   ├── services/          # Game logic and replay recording
 │   ├── routes/            # WebSocket handler
 │   └── types/             # TypeScript type definitions
@@ -68,12 +70,12 @@ pnpm build
 ## 🎯 Game Controls
 
 **Desktop:**
-- Arrow Keys / WASD - Change direction
-- Space - Brake (slow down)
+- Arrow Keys - Change direction (up/down/left/right)
+- Shift - Brake (slow down for precise movement)
 
 **Mobile:**
 - Virtual D-pad on screen
-- Tap brake button to slow down
+- Tap and hold brake button to slow down
 
 ## 🔧 Deployment
 
@@ -93,17 +95,21 @@ Replays use Nuxt Storage API which works with filesystem storage by default. For
 - **XState 5** - State machine management
 - **Nitro** - Server engine with WebSocket support
 - **TypeScript** - Type safety throughout
-- **Nuxt UI** - Component library
-- **Canvas API** - Game rendering
+- **Tailwind CSS** - Utility-first styling with custom Tron theme
+- **Canvas API** - High-performance game rendering
 
 ## 🎨 Game Mechanics
 
 - Grid-based movement with collision detection
-- Trail system that creates walls
-- Speed boost power-ups (2x speed)
-- Brake mechanic for tight turns
-- AI opponents with strategic pathfinding
+- Trail system that creates permanent walls
+- Three power-up types:
+  - **Speed Boost**: Temporary speed increase
+  - **Shield**: One-time invincibility to pass through obstacles
+  - **Trail Eraser**: Clear portions of your trail to create escape routes
+- Brake mechanic for precise control in tight spaces
+- AI opponents with strategic pathfinding and power-up collection
 - Multi-round support with win tracking
+- Four grid sizes: 30x30, 40x40, 50x50, 60x60
 
 ## 📊 State Machine Flow
 
@@ -120,6 +126,13 @@ idle → playing → (gameOver)
 ## 🤝 Contributing
 
 This is a demonstration project showcasing state machine architecture in real-time multiplayer games. Feel free to fork and experiment!
+
+Key areas for enhancement:
+- Additional power-ups and game modes
+- More sound effects and background music
+- Performance optimizations for larger grids
+- Enhanced mobile controls
+- Social features (friends, chat, tournaments)
 
 ## 📄 License
 
