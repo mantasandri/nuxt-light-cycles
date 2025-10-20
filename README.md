@@ -67,6 +67,19 @@ Build for production:
 pnpm build
 ```
 
+Run tests:
+
+```bash
+# Run all tests
+pnpm test
+
+# Run tests in watch mode
+pnpm test:watch
+
+# Run tests with coverage
+pnpm test --coverage
+```
+
 ## 🎯 Game Controls
 
 **Desktop:**
@@ -97,6 +110,7 @@ Replays use Nuxt Storage API which works with filesystem storage by default. For
 - **TypeScript** - Type safety throughout
 - **Tailwind CSS** - Utility-first styling with custom Tron theme
 - **Canvas API** - High-performance game rendering
+- **Vitest** - Unit testing with @nuxt/test-utils
 
 ## 🎨 Game Mechanics
 

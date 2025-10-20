@@ -9,7 +9,10 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest --coverage",
+    "test:ui": "vitest --ui --coverage"
   },
   "dependencies": {
     "@nuxt/eslint": "1.7.0",
@@ -25,5 +28,13 @@
     "vue-router": "^4.5.1",
     "xstate": "^5.23.0"
   },
-  "packageManager": "pnpm@9.3.0+sha1.d4f1da7af76dbdb4ab1a08f6b5add602ffad6fd4"
+  "packageManager": "pnpm@9.3.0+sha1.d4f1da7af76dbdb4ab1a08f6b5add602ffad6fd4",
+  "devDependencies": {
+    "@nuxt/test-utils": "^3.19.2",
+    "@vitest/coverage-v8": "^3.2.4",
+    "@vue/test-utils": "^2.4.6",
+    "happy-dom": "^20.0.7",
+    "playwright-core": "^1.56.1",
+    "vitest": "^3.2.4"
+  }
 }

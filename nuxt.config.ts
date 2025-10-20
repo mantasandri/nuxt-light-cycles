@@ -7,7 +7,8 @@ export default defineNuxtConfig({
     '@nuxt/image',
     '@nuxt/scripts',
     '@nuxtjs/tailwindcss',
-    '@nuxt/eslint'
+    '@nuxt/eslint',
+    '@nuxt/test-utils/module'
   ],
   
   app: {

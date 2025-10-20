@@ -3,6 +3,19 @@ import withNuxt from './.nuxt/eslint.config.mjs'
 
 export default withNuxt(
   {
+    files: ['**/*.test.ts'],
+    languageOptions: {
+      globals: {
+        describe: 'readonly',
+        it: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        vi: 'readonly'
+      }
+    }
+  },
+  {
     rules: {
       // Disable requirement for default values on optional props
       'vue/require-default-prop': 'off',

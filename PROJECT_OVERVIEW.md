@@ -18,6 +18,7 @@ Light Cycles is a competitive grid-based game where players control light cycles
 - **Styling**: Tailwind CSS with custom Tron-themed configuration
 - **Storage**: Browser localStorage for player settings
 - **Component Architecture**: Atomic Design (atoms/molecules/organisms)
+- **Testing**: Vitest with @nuxt/test-utils for component and composable testing
 
 ### Core Components
 
@@ -427,6 +428,27 @@ pnpm preview
 - Server runs on `http://localhost:3000`
 - WebSocket connects to same host automatically
 - Hot module replacement enabled
+
+### Testing
+```bash
+# Run tests
+pnpm test
+
+# Run tests in watch mode
+pnpm test:watch
+
+# Run tests with UI
+pnpm test:ui
+
+# Run tests with coverage
+pnpm test --coverage
+```
+
+Test coverage includes:
+- All atomic components (CircuitButton, CircuitInput, CircuitBadge, etc.)
+- All molecule components (PlayerCard, LobbyCard, FormField, etc.)
+- All organism components (LobbyPanel, LobbyBrowser, ReplayPlayer, etc.)
+- Core composables (usePlayerSettings, useGameAudio, useGameCanvas, etc.)
 
 ## 🎮 How to Play
 
