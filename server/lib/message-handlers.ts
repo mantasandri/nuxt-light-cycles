@@ -908,16 +908,25 @@ const handleSaveReplay = async (
   try {
     console.log(`[WebSocket] Recorder status - actions: ${recorder['actions']?.length || 0}, events: ${recorder['events']?.length || 0}`)
     
-    // Find winner info from lobby context
-    const lobbyCtx = lobbyService.getLobbyContext(lobbyId)
-    const activePlayers = lobbyCtx?.players.filter(p => p.direction !== 'crashed') || []
-    const winnerPlayer = activePlayers.length === 1 ? activePlayers[0] : null
+    // Extract winner info from the gameOver event that was already recorded
+    const events = (recorder as any).events as Array<{ type: string; payload: any }>
+    const gameOverEvent = events.find(e => e.type === 'gameOver')
     
-    const winner = winnerPlayer ? {
-      playerId: winnerPlayer.id,
-      name: winnerPlayer.name,
-      color: winnerPlayer.color,
-    } : null
+    let winner: { playerId: string; name: string; color: string } | null = null
+    
+    if (gameOverEvent && gameOverEvent.payload.winner && !gameOverEvent.payload.draw) {
+      // Get player info from lobby context
+      const lobbyCtx = lobbyService.getLobbyContext(lobbyId)
+      const winnerPlayer = lobbyCtx?.players.find(p => p.id === gameOverEvent.payload.winner)
+      
+      if (winnerPlayer) {
+        winner = {
+          playerId: winnerPlayer.id,
+          name: winnerPlayer.name,
+          color: winnerPlayer.color,
+        }
+      }
+    }
 
     console.log(`[WebSocket] Attempting to save replay for userId ${userId}, winner:`, winner?.name || 'draw')
     const replayId = await recorder.saveReplay(userId, winner)
